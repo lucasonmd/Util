@@ -2,13 +2,6 @@ using System;
 
 namespace GeoPositioning
 {
-    public class TargetLocation
-    {
-        public double? Latitude  { get; set; }
-        public double? Longitude { get; set; }
-        public double? Altitude  { get; set; }
-    }
-
     public static class PositionEstimator
     {
         private const double A  = 6378137.0;
@@ -25,7 +18,10 @@ namespace GeoPositioning
         /// <param name="sensorYaw">Sensor azimuth (degrees, relative to mount)</param>
         /// <param name="sensorPitch">Sensor elevation (degrees, positive up)</param>
         /// <param name="distance">Measured range to target (m)</param>
-        public static TargetLocation Calculate(
+        /// <param name="latitude">Target latitude (degrees, WGS84)</param>
+        /// <param name="longitude">Target longitude (degrees, WGS84)</param>
+        /// <param name="altitude">Target altitude (m, MSL)</param>
+        public static bool Calculate(
             double? vehicleLat,
             double? vehicleLon,
             double? vehicleAlt,
@@ -35,13 +31,18 @@ namespace GeoPositioning
             double? mountYaw,
             double? sensorYaw,
             double? sensorPitch,
-            double? distance)
+            double? distance,
+            out double latitude,
+            out double longitude,
+            out double altitude)
         {
+            latitude = longitude = altitude = 0.0;
+
             if (!vehicleLat.HasValue  || !vehicleLon.HasValue  || !vehicleAlt.HasValue  ||
                 !vehicleRoll.HasValue || !vehiclePitch.HasValue || !vehicleYaw.HasValue  ||
                 !mountYaw.HasValue    || !sensorYaw.HasValue    || !sensorPitch.HasValue ||
                 !distance.HasValue)
-                return new TargetLocation();
+                return false;
 
             double latRad       = ToRad(vehicleLat.Value);
             double rollRad      = ToRad(vehicleRoll.Value);
@@ -71,14 +72,13 @@ namespace GeoPositioning
 
             double cosLat = Math.Cos(latRad);
             if (Math.Abs(cosLat) < 1e-10)
-                return new TargetLocation();
+                return false;
 
-            return new TargetLocation
-            {
-                Latitude  = vehicleLat.Value + ToDeg(dNorth / M),
-                Longitude = vehicleLon.Value + ToDeg(dEast  / (N * cosLat)),
-                Altitude  = vehicleAlt.Value - dDown
-            };
+            latitude  = vehicleLat.Value + ToDeg(dNorth / M);
+            longitude = vehicleLon.Value + ToDeg(dEast  / (N * cosLat));
+            altitude  = vehicleAlt.Value - dDown;
+
+            return true;
         }
 
         private static double[] BodyToNed(double[] v, double roll, double pitch, double yaw)
