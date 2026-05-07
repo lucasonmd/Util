@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+    <PackageReference Include="MessagePack" Version="2.5.187" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RuntimeMonitor.Core\RuntimeMonitor.Core.csproj" />
+  </ItemGroup>
+</Project>

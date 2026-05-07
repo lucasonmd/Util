@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>WinExe</OutputType>
+    <StartupObject>RuntimeMonitor.Viewer.App</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MessagePack" Version="2.5.187" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RuntimeMonitor.Core\RuntimeMonitor.Core.csproj" />
+  </ItemGroup>
+</Project>
