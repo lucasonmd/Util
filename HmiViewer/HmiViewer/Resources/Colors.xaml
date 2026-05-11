@@ -1,0 +1,56 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Base Colors -->
+    <Color x:Key="BgBlackColor">#FF0A0C0F</Color>
+    <Color x:Key="BgDarkColor">#FF0F1318</Color>
+    <Color x:Key="BgPanelColor">#FF141A22</Color>
+    <Color x:Key="BgSurfaceColor">#FF1A2230</Color>
+
+    <!-- Neon Accent Colors -->
+    <Color x:Key="NeonBlueColor">#FF00B4D8</Color>
+    <Color x:Key="NeonCyanColor">#FF00F5D4</Color>
+    <Color x:Key="NeonBlueGlowColor">#8800B4D8</Color>
+    <Color x:Key="NeonCyanDimColor">#FF007A6E</Color>
+
+    <!-- State Colors -->
+    <Color x:Key="StateDisconnectedColor">#FFFF3B3B</Color>
+    <Color x:Key="StateReadyColor">#FFFFB800</Color>
+    <Color x:Key="StateRunningColor">#FF00FF88</Color>
+
+    <!-- Text Colors -->
+    <Color x:Key="TextPrimaryColor">#FFE0F0FF</Color>
+    <Color x:Key="TextSecondaryColor">#FF607080</Color>
+    <Color x:Key="TextDimColor">#FF304050</Color>
+
+    <!-- Border Colors -->
+    <Color x:Key="BorderNormalColor">#FF1E3040</Color>
+    <Color x:Key="BorderActiveColor">#FF00B4D8</Color>
+    <Color x:Key="BorderSelectedColor">#FF00F5D4</Color>
+
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="BgBlackBrush"       Color="{StaticResource BgBlackColor}"/>
+    <SolidColorBrush x:Key="BgDarkBrush"         Color="{StaticResource BgDarkColor}"/>
+    <SolidColorBrush x:Key="BgPanelBrush"        Color="{StaticResource BgPanelColor}"/>
+    <SolidColorBrush x:Key="BgSurfaceBrush"      Color="{StaticResource BgSurfaceColor}"/>
+
+    <SolidColorBrush x:Key="NeonBlueBrush"       Color="{StaticResource NeonBlueColor}"/>
+    <SolidColorBrush x:Key="NeonCyanBrush"       Color="{StaticResource NeonCyanColor}"/>
+    <SolidColorBrush x:Key="NeonCyanDimBrush"    Color="{StaticResource NeonCyanDimColor}"/>
+
+    <SolidColorBrush x:Key="StateDisconnectedBrush" Color="{StaticResource StateDisconnectedColor}"/>
+    <SolidColorBrush x:Key="StateReadyBrush"     Color="{StaticResource StateReadyColor}"/>
+    <SolidColorBrush x:Key="StateRunningBrush"   Color="{StaticResource StateRunningColor}"/>
+
+    <SolidColorBrush x:Key="TextPrimaryBrush"    Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush"  Color="{StaticResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextDimBrush"        Color="{StaticResource TextDimColor}"/>
+
+    <SolidColorBrush x:Key="BorderNormalBrush"   Color="{StaticResource BorderNormalColor}"/>
+    <SolidColorBrush x:Key="BorderActiveBrush"   Color="{StaticResource BorderActiveColor}"/>
+    <SolidColorBrush x:Key="BorderSelectedBrush" Color="{StaticResource BorderSelectedColor}"/>
+
+    <!-- Transparent Video area -->
+    <SolidColorBrush x:Key="VideoAreaBrush"      Color="Transparent"/>
+
+</ResourceDictionary>
