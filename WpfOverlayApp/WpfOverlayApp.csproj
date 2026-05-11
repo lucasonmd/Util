@@ -10,4 +10,16 @@
     <RootNamespace>WpfOverlayApp</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Update="layout.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MaterialDesignThemes" Version="5.1.0" />
+  </ItemGroup>
+
+
+
 </Project>
