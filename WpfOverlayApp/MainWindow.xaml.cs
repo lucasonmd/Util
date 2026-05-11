@@ -50,6 +50,7 @@ namespace WpfOverlayApp
         private bool         _editMode       = false;
         private int          _selectedIndex  = -1;
         private int          _activeSubView  = -1;  // 0~4
+        private int          _activeMainTab  = -1;  // 0~7
         private bool         _suppressKeyDown = false; // 내부 SimulateKey 이중처리 방지
 
         private int            _dragIndex        = -1;
@@ -269,6 +270,8 @@ namespace WpfOverlayApp
 
             for (int i = 0; i < MainViewButtons.Length; i++)
             {
+                bool isActive = i == _activeMainTab;
+
                 var btn = new Button
                 {
                     Content             = MainViewButtons[i],
@@ -281,13 +284,35 @@ namespace WpfOverlayApp
                     VerticalAlignment   = VerticalAlignment.Stretch,
                     Cursor              = Cursors.Hand,
                     FontSize            = 15,
-                    FontWeight          = FontWeights.Medium,
-                    Foreground          = new SolidColorBrush(Color.FromArgb(0xBB, 0xAA, 0xAA, 0xAA)),
-                    Background          = Brushes.Transparent,
+                    FontWeight          = isActive ? FontWeights.SemiBold : FontWeights.Medium,
+                    Foreground          = isActive
+                        ? new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF))
+                        : new SolidColorBrush(Color.FromArgb(0x88, 0xAA, 0xAA, 0xAA)),
+                    Background          = isActive
+                        ? new SolidColorBrush(Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF))
+                        : Brushes.Transparent,
                 };
                 btn.Click += OnMainViewButtonClick;
                 Grid.SetColumn(btn, i);
                 grid.Children.Add(btn);
+
+                // 활성 탭 하단 인디케이터
+                if (isActive)
+                {
+                    var indicator = new Rectangle
+                    {
+                        Width               = double.NaN,
+                        Height              = 2,
+                        Fill                = new SolidColorBrush(Color.FromArgb(0xDD, 0x00, 0x7A, 0xFF)),
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                        VerticalAlignment   = VerticalAlignment.Bottom,
+                        IsHitTestVisible    = false,
+                        Margin              = new Thickness(8, 0, 8, 0)
+                    };
+                    Grid.SetColumn(indicator, i);
+                    Panel.SetZIndex(indicator, 2);
+                    grid.Children.Add(indicator);
+                }
 
                 // 탭 간 구분선 (첫 번째 제외)
                 if (i > 0)
@@ -295,8 +320,8 @@ namespace WpfOverlayApp
                     var sep = new Rectangle
                     {
                         Width               = 1,
-                        Height              = TabBarH * 0.55,
-                        Fill                = new SolidColorBrush(Color.FromArgb(0x60, 0x60, 0x90, 0xC0)),
+                        Height              = TabBarH * 0.4,
+                        Fill                = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)),
                         HorizontalAlignment = HorizontalAlignment.Left,
                         VerticalAlignment   = VerticalAlignment.Center,
                         IsHitTestVisible    = false
@@ -363,7 +388,9 @@ namespace WpfOverlayApp
         private void ActivateMainButton(int index)
         {
             if (index < 0 || index >= MainViewButtons.Length) return;
+            _activeMainTab = index;
             DoMainButtonAction(index);
+            RenderAll();
 
             var mv    = _boxes[0];
             double tabW = mv.Width / MainViewButtons.Length;

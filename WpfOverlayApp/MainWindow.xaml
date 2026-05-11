@@ -21,6 +21,7 @@
         <!-- 네비게이션 바 -->
         <Border VerticalAlignment="Top" Height="48" Panel.ZIndex="1"
                 Background="#EA252628"
+                BorderBrush="#18FFFFFF" BorderThickness="0,0,0,1"
                 MouseLeftButtonDown="NavBar_MouseLeftButtonDown">
             <Grid Margin="16,0">
 
@@ -48,7 +49,7 @@
                                 <Setter Property="Cursor" Value="Hand"/>
                                 <Setter Property="Background" Value="Transparent"/>
                                 <Setter Property="Foreground" Value="#88FFFFFF"/>
-                                <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+                                <Setter Property="BorderBrush" Value="#44FFFFFF"/>
                                 <Setter Property="BorderThickness" Value="1"/>
                                 <Setter Property="Template">
                                     <Setter.Value>
@@ -103,7 +104,7 @@
                                 <Setter Property="Cursor" Value="Hand"/>
                                 <Setter Property="Background" Value="Transparent"/>
                                 <Setter Property="Foreground" Value="#88FFFFFF"/>
-                                <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+                                <Setter Property="BorderBrush" Value="#44FFFFFF"/>
                                 <Setter Property="BorderThickness" Value="1"/>
                                 <Setter Property="Template">
                                     <Setter.Value>
@@ -146,6 +147,9 @@
                             <TextBlock Text="레이아웃 편집" FontSize="11" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ToggleButton>
+
+                    <!-- 시스템 버튼 구분선 -->
+                    <Rectangle Width="1" Height="18" Fill="#22FFFFFF" Margin="4,0"/>
 
                     <!-- 최소화 (인라인 템플릿 + Ripple) -->
                     <Button Foreground="#77FFFFFF" Background="Transparent" BorderThickness="0"
@@ -203,14 +207,14 @@
                 Margin="0,52,8,0"
                 Panel.ZIndex="2"
                 Background="#F22F3032"
-                BorderBrush="{DynamicResource PrimaryHueMidBrush}"
+                BorderBrush="#22FFFFFF"
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="16">
             <StackPanel Width="210">
 
                 <TextBlock Name="EditPanelTitle" Text="Box"
-                           Foreground="{DynamicResource PrimaryHueLightBrush}"
+                           Foreground="#66FFFFFF"
                            FontSize="10" FontWeight="Medium"
                            Margin="2,0,0,14"/>
 
@@ -248,7 +252,7 @@
                 Margin="8,52,0,0"
                 Panel.ZIndex="2"
                 Background="#F22F3032"
-                BorderBrush="{DynamicResource PrimaryHueMidBrush}"
+                BorderBrush="#22FFFFFF"
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="16">
