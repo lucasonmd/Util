@@ -6,10 +6,12 @@ Scans a folder recursively for .cs files and extracts all variables and
 functions, writing results to a CSV file.
 
 CSV columns:
-    경로      - full file path including filename
-    파일이름  - filename only
-    형식      - variable: data type  /  function: return type
-    이름      - variable: name  /  function: name(params)
+    경로        - full file path including filename
+    파일이름    - filename only
+    형식        - variable: data type  /  function: return type
+    이름        - variable: name  /  function: name(params)
+    입력자료형  - function only: parameter types (e.g. "int, string"), "-" if none / n/a
+    출력자료형  - function only: return type,  "-" for variables
 
 Usage:
     python cs_extractor.py <folder_path> <output_csv>
@@ -153,18 +155,58 @@ def normalize(s: str) -> str:
     return re.sub(r'\s+', ' ', s).strip()
 
 
+def split_params(raw: str) -> list[str]:
+    """Split parameter string by commas that are NOT inside < > brackets."""
+    parts, depth, buf = [], 0, []
+    for ch in raw:
+        if ch == '<':
+            depth += 1
+            buf.append(ch)
+        elif ch == '>':
+            depth -= 1
+            buf.append(ch)
+        elif ch == ',' and depth == 0:
+            parts.append(''.join(buf).strip())
+            buf = []
+        else:
+            buf.append(ch)
+    if buf:
+        parts.append(''.join(buf).strip())
+    return [p for p in parts if p]
+
+
 def clean_params(raw: str) -> str:
     """Normalize parameter list: keep type+name, remove defaults & modifiers."""
     if not raw.strip():
         return ''
     parts = []
-    for p in raw.split(','):
-        p = re.sub(r'\s*=\s*.+$', '', p)                       # remove default value
-        p = re.sub(r'^\s*(?:ref|out|in|params|this)\s+', '', p) # remove param modifiers
+    for p in split_params(raw):
+        p = re.sub(r'\s*=\s*.+$', '', p)                        # remove default value
+        p = re.sub(r'^\s*(?:ref|out|in|params|this)\s+', '', p)  # remove param modifiers
         p = normalize(p)
         if p:
             parts.append(p)
     return ', '.join(parts)
+
+
+def param_types_only(raw: str) -> str:
+    """Return only the types from a parameter string, '-' if no parameters.
+
+    'int amount, List<string> items' -> 'int, List<string>'
+    """
+    if not raw.strip():
+        return '-'
+    types = []
+    for p in split_params(raw):
+        p = re.sub(r'\s*=\s*.+$', '', p)                        # remove default value
+        p = re.sub(r'^\s*(?:ref|out|in|params|this)\s+', '', p)  # remove param modifiers
+        p = normalize(p)
+        if not p:
+            continue
+        # Type is everything before the last identifier (the parameter name)
+        m = re.match(r'^(.*)\s+[a-zA-Z_]\w*$', p)
+        types.append(m.group(1).strip() if m else p)
+    return ', '.join(types) if types else '-'
 
 
 def is_valid(word: str) -> bool:
@@ -185,24 +227,27 @@ def extract_from_file(path: Path) -> list:
     seen: set = set()
     rows: list = []
 
-    def add(kind_type: str, kind_name: str) -> None:
+    def add(kind_type: str, kind_name: str,
+            in_types: str = '-', out_type: str = '-') -> None:
         key = (filepath, kind_type, kind_name)
         if key not in seen:
             seen.add(key)
-            rows.append([filepath, filename, kind_type, kind_name])
+            rows.append([filepath, filename, kind_type, kind_name, in_types, out_type])
 
     # Collect method match positions to avoid re-matching as fields/properties
     method_starts: set = set()
 
     # ── Methods ───────────────────────────────────────────────────────────────
     for m in METHOD_RE.finditer(code):
-        ret  = normalize(m.group(1))
-        name = m.group(2)
-        params = clean_params(m.group(3)[1:-1])   # strip outer parentheses
+        ret        = normalize(m.group(1))
+        name       = m.group(2)
+        raw_params = m.group(3)[1:-1]              # strip outer parentheses
+        params     = clean_params(raw_params)
+        in_types   = param_types_only(raw_params)
         if not is_valid(ret) or not is_valid(name):
             continue
         method_starts.add(m.start())
-        add(ret, f'{name}({params})')
+        add(ret, f'{name}({params})', in_types, ret)
 
     # ── Properties ────────────────────────────────────────────────────────────
     for m in PROPERTY_RE.finditer(code):
@@ -216,7 +261,7 @@ def extract_from_file(path: Path) -> list:
         between = code[m.start(2) + len(name) : m.end()]
         if '(' in between:
             continue
-        add(t, name)
+        add(t, name)   # in_types='-', out_type='-'
 
     # ── Fields / Variables ────────────────────────────────────────────────────
     for m in FIELD_RE.finditer(code):
@@ -227,7 +272,7 @@ def extract_from_file(path: Path) -> list:
         name = m.group(2)
         if not is_valid(t) or not is_valid(name):
             continue
-        add(t, name)
+        add(t, name)   # in_types='-', out_type='-'
 
     return rows
 
@@ -255,7 +300,7 @@ def run(folder: str, output_csv: str) -> None:
     out = Path(output_csv)
     with out.open('w', newline='', encoding='utf-8-sig') as fh:
         writer = csv.writer(fh)
-        writer.writerow(['경로', '파일이름', '형식', '이름'])
+        writer.writerow(['경로', '파일이름', '형식', '이름', '입력자료형', '출력자료형'])
         writer.writerows(all_rows)
 
     print(f'\nDone.  {len(all_rows)} rows  →  {output_csv}')
