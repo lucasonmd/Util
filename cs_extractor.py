@@ -228,11 +228,12 @@ def extract_from_file(path: Path) -> list:
     rows: list = []
 
     def add(kind_type: str, kind_name: str,
-            in_types: str = '-', out_type: str = '-') -> None:
+            in_types: str = '-', out_type: str = '-',
+            kind: str = '변수') -> None:
         key = (filepath, kind_type, kind_name)
         if key not in seen:
             seen.add(key)
-            rows.append([filepath, filename, kind_type, kind_name, in_types, out_type])
+            rows.append([filepath, filename, kind, kind_type, kind_name, in_types, out_type])
 
     # Collect method match positions to avoid re-matching as fields/properties
     method_starts: set = set()
@@ -247,7 +248,7 @@ def extract_from_file(path: Path) -> list:
         if not is_valid(ret) or not is_valid(name):
             continue
         method_starts.add(m.start())
-        add(ret, f'{name}({params})', in_types, ret)
+        add(ret, f'{name}({params})', in_types, ret, '함수')
 
     # ── Properties ────────────────────────────────────────────────────────────
     for m in PROPERTY_RE.finditer(code):
@@ -300,7 +301,7 @@ def run(folder: str, output_csv: str) -> None:
     out = Path(output_csv)
     with out.open('w', newline='', encoding='utf-8-sig') as fh:
         writer = csv.writer(fh)
-        writer.writerow(['경로', '파일이름', '형식', '이름', '입력자료형', '출력자료형'])
+        writer.writerow(['경로', '파일이름', '종류', '형식', '이름', '입력자료형', '출력자료형'])
         writer.writerows(all_rows)
 
     print(f'\nDone.  {len(all_rows)} rows  →  {output_csv}')
