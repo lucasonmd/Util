@@ -1,0 +1,76 @@
+<UserControl x:Class="TRA.MainView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:TRA"
+             mc:Ignorable="d"
+             Width="1590" Height="910">
+
+    <Grid Background="#000000">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="400"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ===== 좌측 : 전술 표시 ===== -->
+        <Canvas x:Name="OverlayCanvas" Grid.Column="0" Background="#000000"/>
+
+        <!-- ===== 우측 : 설정 패널 ===== -->
+        <Border Grid.Column="1"
+                Background="#000000"
+                BorderBrush="#0A1420"
+                BorderThickness="1,0,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="52"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- 헤더 -->
+                <Border Grid.Row="0" BorderBrush="#0A1420" BorderThickness="0,0,0,1"
+                        Background="#000000">
+                    <TextBlock x:Name="HeaderText"
+                               Text="구동 제한 구역 설정"
+                               Foreground="#FFFFFF"
+                               FontFamily="Microsoft Sans Serif"
+                               FontSize="20"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Border>
+
+                <!-- 구역 목록 -->
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Background="#000000">
+                    <StackPanel x:Name="ZoneListPanel"/>
+                </ScrollViewer>
+
+                <!-- 편집 패널 -->
+                <Border Grid.Row="2"
+                        BorderBrush="#0A1420"
+                        BorderThickness="0,1,0,0"
+                        Background="#000000">
+                    <StackPanel Margin="14,12,14,14">
+
+                        <!-- 구역 ID 바 -->
+                        <Border BorderBrush="#0A1420" BorderThickness="0,0,0,1"
+                                Margin="0,0,0,10" Padding="0,0,0,8">
+                            <TextBlock x:Name="EditPanelTitle"
+                                       Foreground="#FFFFFF"
+                                       FontFamily="Microsoft Sans Serif"
+                                       FontSize="24"
+                                       FontWeight="Bold"/>
+                        </Border>
+
+                        <local:KeypadControl x:Name="Keypad"/>
+
+                    </StackPanel>
+                </Border>
+
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
