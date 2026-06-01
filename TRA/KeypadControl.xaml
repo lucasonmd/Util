@@ -12,7 +12,7 @@
             <Setter Property="Foreground"       Value="#FFFFFF"/>
             <Setter Property="BorderBrush"      Value="#141E2A"/>
             <Setter Property="BorderThickness"  Value="1"/>
-            <Setter Property="FontFamily"       Value="Consolas"/>
+            <Setter Property="FontFamily"       Value="Microsoft Sans Serif"/>
             <Setter Property="FontSize"         Value="22"/>
             <Setter Property="FontWeight"       Value="Bold"/>
             <Setter Property="Cursor"           Value="Hand"/>
@@ -93,11 +93,11 @@
                     Click="FieldBtn_Click" Tag="AzMin">
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock x:Name="LblAzMin" Text="AZ  MIN"
-                               FontFamily="Consolas" FontSize="20"
+                               FontFamily="Microsoft Sans Serif" FontSize="20"
                                Foreground="#3C5A70"
                                HorizontalAlignment="Center" Margin="0,0,0,3"/>
                     <TextBlock x:Name="ValAzMin"
-                               FontFamily="Consolas" FontSize="22"
+                               FontFamily="Microsoft Sans Serif" FontSize="22"
                                FontWeight="Bold" Foreground="#FFFFFF"
                                HorizontalAlignment="Center"/>
                 </StackPanel>
@@ -108,11 +108,11 @@
                     Click="FieldBtn_Click" Tag="AzMax">
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock x:Name="LblAzMax" Text="AZ  MAX"
-                               FontFamily="Consolas" FontSize="20"
+                               FontFamily="Microsoft Sans Serif" FontSize="20"
                                Foreground="#3C5A70"
                                HorizontalAlignment="Center" Margin="0,0,0,3"/>
                     <TextBlock x:Name="ValAzMax"
-                               FontFamily="Consolas" FontSize="22"
+                               FontFamily="Microsoft Sans Serif" FontSize="22"
                                FontWeight="Bold" Foreground="#FFFFFF"
                                HorizontalAlignment="Center"/>
                 </StackPanel>
@@ -123,11 +123,11 @@
                     Click="FieldBtn_Click" Tag="ElMin">
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock x:Name="LblElMin" Text="EL  MIN"
-                               FontFamily="Consolas" FontSize="20"
+                               FontFamily="Microsoft Sans Serif" FontSize="20"
                                Foreground="#3C5A70"
                                HorizontalAlignment="Center" Margin="0,0,0,3"/>
                     <TextBlock x:Name="ValElMin"
-                               FontFamily="Consolas" FontSize="22"
+                               FontFamily="Microsoft Sans Serif" FontSize="22"
                                FontWeight="Bold" Foreground="#FFFFFF"
                                HorizontalAlignment="Center"/>
                 </StackPanel>
@@ -138,11 +138,11 @@
                     Click="FieldBtn_Click" Tag="ElMax">
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock x:Name="LblElMax" Text="EL  MAX"
-                               FontFamily="Consolas" FontSize="20"
+                               FontFamily="Microsoft Sans Serif" FontSize="20"
                                Foreground="#3C5A70"
                                HorizontalAlignment="Center" Margin="0,0,0,3"/>
                     <TextBlock x:Name="ValElMax"
-                               FontFamily="Consolas" FontSize="22"
+                               FontFamily="Microsoft Sans Serif" FontSize="22"
                                FontWeight="Bold" Foreground="#FFFFFF"
                                HorizontalAlignment="Center"/>
                 </StackPanel>
@@ -155,7 +155,7 @@
             <TextBlock x:Name="KeypadDisplay"
                        Text="---"
                        Foreground="#FFFFFF"
-                       FontFamily="Consolas"
+                       FontFamily="Microsoft Sans Serif"
                        FontSize="24"
                        FontWeight="Bold"
                        TextAlignment="Center"

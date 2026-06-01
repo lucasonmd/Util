@@ -18,6 +18,7 @@ namespace TRA
         private static readonly Color PalMid    = Color.FromRgb( 68, 108, 145);
         private static readonly Color PalDim    = Color.FromRgb( 22,  44,  66);
         private static readonly Color PalDark   = Color.FromRgb(  7,  14,  24);
+        private static readonly Color PalZone   = Color.FromRgb(220,  50,  40);
 
         private static readonly SolidColorBrush ItemNormalBrush   = new(Color.FromRgb( 0,  0,  0));
         private static readonly SolidColorBrush ItemSelectedBrush = new(Color.FromRgb( 4, 12, 22));
@@ -80,7 +81,7 @@ namespace TRA
                     if (_selectedZone == null) return;
                     string name = $"zone{_selectedZone.Id:00}_{field}";
                     ApplyValue(name, value);
-                    OnTransmit?.Invoke(name, value);
+                    OnTransmit?.Invoke(name, Math.Truncate(value / 0.006));
                 };
 
                 InitZones();
@@ -131,7 +132,7 @@ namespace TRA
             {
                 Text       = FormatDetail(zone),
                 Foreground = new SolidColorBrush(isSel ? PalMid : PalDim),
-                FontFamily = new FontFamily("Consolas"),
+                FontFamily = new FontFamily("Microsoft Sans Serif"),
                 FontSize   = 20,
                 Margin     = new Thickness(0, 4, 0, 0),
             };
@@ -219,10 +220,13 @@ namespace TRA
 
         // 외부에서 값을 받아 화면에 반영 (string name, double value)
         public void ReceiveValue(string name, double value) =>
-            Dispatcher.Invoke(() => ApplyValue(name, value));
+            Dispatcher.Invoke(() => ApplyValue(name, Math.Truncate(value * 0.006)));
 
         private string FormatDetail(DriveLimitZone z) =>
-            $"{T("az")} {(int)z.AzimuthMin:D4}~{(int)z.AzimuthMax:D4}  {T("el")} {ElStr(z.ElevationMin)}~{ElStr(z.ElevationMax)}";
+            $"{T("az")} {AzStr(z.AzimuthMin)}~{AzStr(z.AzimuthMax)}  {T("el")} {ElStr(z.ElevationMin)}~{ElStr(z.ElevationMax)}";
+
+        private static string AzStr(double v) =>
+            v >= 0 ? $"+{(int)v:0000}" : $"-{(int)Math.Abs(v):0000}";
 
         private static string ElStr(double v) =>
             v >= 0 ? $"+{(int)v:00}" : $"-{(int)Math.Abs(v):00}";
@@ -239,10 +243,10 @@ namespace TRA
             if (cx < 10 || cy < 10) return;
 
             double minDim = Math.Min(cx, cy);
-            double tankS  = minDim * 0.38;
-            double innerR = minDim * 0.20;
-            double zoneR  = minDim * 0.54;
-            double ringR  = minDim * 0.80;
+            double tankS  = minDim * 0.46;
+            double innerR = minDim * 0.24;
+            double zoneR  = minDim * 0.65;
+            double ringR  = minDim * 0.84;
 
             DrawGrid(cx, cy, ringR, zoneR, innerR);
             DrawZones(cx, cy, innerR, zoneR);
@@ -254,15 +258,15 @@ namespace TRA
         private void DrawGrid(double cx, double cy, double ringR, double zoneR, double innerR)
         {
             double ext = ringR * 1.05;
-            AddLine(cx, cy - ext, cx, cy + ext, PalDark, 1);
-            AddLine(cx - ext, cy, cx + ext, cy, PalDark, 1);
+            AddLine(cx, cy - ext, cx, cy + ext, Color.FromRgb(18, 36, 54), 1);
+            AddLine(cx - ext, cy, cx + ext, cy, Color.FromRgb(18, 36, 54), 1);
 
             double d = ext * 0.707;
-            AddLine(cx - d, cy - d, cx + d, cy + d, Color.FromRgb(4, 8, 14), 1);
-            AddLine(cx + d, cy - d, cx - d, cy + d, Color.FromRgb(4, 8, 14), 1);
+            AddLine(cx - d, cy - d, cx + d, cy + d, Color.FromRgb(10, 20, 32), 1);
+            AddLine(cx + d, cy - d, cx - d, cy + d, Color.FromRgb(10, 20, 32), 1);
 
             foreach (var r in new[] { innerR * 1.5, zoneR * 0.70, zoneR, zoneR * 1.30 })
-                AddRing(cx, cy, r, Color.FromRgb(8, 18, 28), 0.6, dashed: true);
+                AddRing(cx, cy, r, Color.FromRgb(18, 36, 54), 0.8, dashed: true);
         }
 
         // ── 구역 섹터 (방위 = MIL) ────────────────────────────────
@@ -280,15 +284,15 @@ namespace TRA
                 if (isSel)
                 {
                     var glow = MakeSector(cx, cy, innerR - 4, outerR + 8,
-                                          azMinDeg, sweepDeg, PalBright, 12);
+                                          azMinDeg, sweepDeg, PalZone, 18);
                     glow.StrokeThickness = 0;
                     OverlayCanvas.Children.Add(glow);
                 }
 
-                byte fill   = isSel ? (byte)65 : (byte)16;
-                byte stroke = isSel ? (byte)200 : (byte)65;
-                var sec = MakeSector(cx, cy, innerR, outerR, azMinDeg, sweepDeg, PalBright, fill);
-                sec.Stroke          = new SolidColorBrush(Color.FromArgb(stroke, PalBright.R, PalBright.G, PalBright.B));
+                byte fill   = isSel ? (byte)80 : (byte)30;
+                byte stroke = isSel ? (byte)210 : (byte)100;
+                var sec = MakeSector(cx, cy, innerR, outerR, azMinDeg, sweepDeg, PalZone, fill);
+                sec.Stroke          = new SolidColorBrush(Color.FromArgb(stroke, PalZone.R, PalZone.G, PalZone.B));
                 sec.StrokeThickness = isSel ? 1.5 : 1;
                 OverlayCanvas.Children.Add(sec);
 
@@ -301,10 +305,9 @@ namespace TRA
                     AddText($"{zone.Id:00}",
                         cx + midR * Math.Cos(rad),
                         cy + midR * Math.Sin(rad),
-                        isSel ? Colors.White : PalMid,
+                        isSel ? Colors.White : Color.FromRgb(200, 100, 90),
                         isSel ? 14 : 12,
-                        isSel ? FontWeights.Bold : FontWeights.Normal,
-                        "Consolas");
+                        isSel ? FontWeights.Bold : FontWeights.Normal);
                 }
             }
         }
@@ -344,18 +347,18 @@ namespace TRA
         // ── 나침반 링 (MIL 눈금, N/E/S/W 고정) ───────────────────
         private void DrawCompassRing(double cx, double cy, double ringR)
         {
-            AddRing(cx, cy, ringR, PalDim, 1);
+            AddRing(cx, cy, ringR, Color.FromRgb(50, 95, 140), 1.5);
 
             for (int mil = 0; mil < 6400; mil += 100)
             {
                 bool   large = mil % 800 == 0;
                 bool   mid   = mil % 400 == 0;
-                double len   = large ? 14 : (mid ? 7 : 3.5);
+                double len   = large ? 16 : (mid ? 8 : 4);
                 double deg   = MilToDeg(mil);
                 double rad   = ToRad(deg - 90);
                 double cos   = Math.Cos(rad), sin = Math.Sin(rad);
-                var    col   = large ? PalDim : Color.FromRgb(12, 26, 40);
-                double thk   = large ? 1.2 : 0.7;
+                var    col   = large ? Color.FromRgb(60, 115, 165) : (mid ? Color.FromRgb(30, 62, 92) : Color.FromRgb(18, 38, 58));
+                double thk   = large ? 1.6 : (mid ? 1.0 : 0.7);
                 AddLine2(cx + (ringR - len) * cos, cy + (ringR - len) * sin,
                          cx +  ringR       * cos,  cy +  ringR       * sin,
                          col, thk);
@@ -364,24 +367,25 @@ namespace TRA
             for (int mil = 0; mil < 6400; mil += 800)
             {
                 bool   isCard = mil % 1600 == 0;
+                int    disp   = mil > 3200 ? mil - 6400 : mil;
                 string label  = mil switch
                 {
                     0    => "N",
                     1600 => "E",
                     3200 => "S",
                     4800 => "W",
-                    _    => mil.ToString(),
+                    _    => disp.ToString(),
                 };
                 double deg = MilToDeg(mil);
                 double rad = ToRad(deg - 90);
-                double lr  = ringR + (isCard ? 26 : 20);
+                double lr  = ringR + (isCard ? 28 : 22);
                 AddText(label,
                     cx + lr * Math.Cos(rad),
                     cy + lr * Math.Sin(rad),
-                    isCard ? Colors.White : PalDim,
-                    isCard ? 14 : 11,
+                    isCard ? Colors.White : Color.FromRgb(110, 165, 210),
+                    isCard ? 15 : 12,
                     isCard ? FontWeights.Bold : FontWeights.Normal,
-                    "Consolas");
+                    "Microsoft Sans Serif");
             }
         }
 
@@ -473,7 +477,7 @@ namespace TRA
         }
 
         private void AddText(string text, double x, double y, Color color,
-                              double size, FontWeight weight, string family = "Consolas")
+                              double size, FontWeight weight, string family = "Microsoft Sans Serif")
         {
             var tb = new TextBlock
             {

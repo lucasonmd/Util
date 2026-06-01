@@ -35,8 +35,8 @@ namespace TRA
 
         public void SetFieldValues(double azMin, double azMax, double elMin, double elMax)
         {
-            ValAzMin.Text = ((int)azMin).ToString("D4");
-            ValAzMax.Text = ((int)azMax).ToString("D4");
+            ValAzMin.Text = AzStr(azMin);
+            ValAzMax.Text = AzStr(azMax);
             ValElMin.Text = ElStr(elMin);
             ValElMax.Text = ElStr(elMax);
         }
@@ -100,7 +100,7 @@ namespace TRA
             string key = (sender as Button)?.Content?.ToString() ?? "";
 
             bool isAz      = _activeField is ActiveField.AzMin or ActiveField.AzMax;
-            bool allowNeg  = !isAz;
+            bool allowNeg  = true;
             int  maxDigits = isAz ? 4 : 3;
 
             if (key == "−")
@@ -138,6 +138,9 @@ namespace TRA
             _inputBuffer       = "";
             KeypadDisplay.Text = "---";
         }
+
+        private static string AzStr(double v) =>
+            v >= 0 ? $"+{(int)v:0000}" : $"-{(int)Math.Abs(v):0000}";
 
         private static string ElStr(double v) =>
             v >= 0 ? $"+{(int)v:00}" : $"-{(int)Math.Abs(v):00}";
