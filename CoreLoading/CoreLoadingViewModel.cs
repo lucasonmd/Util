@@ -259,6 +259,12 @@ internal class CoreLoadingViewModel : ViewModelBase
 
     private async Task RestartAppAsync(AppInitViewModel app)
     {
+        if (_processes.TryGetValue(app.AppName, out var old))
+        {
+            try { old.Kill(); } catch { }
+            _processes.Remove(app.AppName);
+        }
+
         _stageSignals[app.AppName] = [new(), new(), new()];
         foreach (var s in app.Stages) s.State = StageState.Waiting;
         app.IsTimedOut = false;
