@@ -171,11 +171,10 @@ internal class CoreLoadingViewModel : ViewModelBase
         UpdateProgress();
     }
 
-    internal void Notify(string appName)
+    internal void Notify(string appName, int stage)
     {
         if (!_stageSignals.TryGetValue(appName, out var signals)) return;
-        foreach (var tcs in signals)
-            if (tcs.TrySetResult()) return;
+        signals[stage].TrySetResult();
     }
 
     internal void NotifyCoreReady() => _coreReadySignal.TrySetResult();
@@ -222,7 +221,7 @@ internal class CoreLoadingViewModel : ViewModelBase
             if (process is not null)
             {
                 _processes[app.AppName] = process;
-                Notify(app.AppName);
+                Notify(app.AppName, 0);
             }
         }
         catch { }

@@ -29,13 +29,13 @@ public partial class App : Application
         var perApp = names.Select(name => Task.Run(async () =>
         {
             await Task.Delay(rng.Next(500, 2000));
-            w.Notify(name);
+            w.Notify(name, 0);
 
             await Task.Delay(rng.Next(800, 3000));
-            w.Notify(name);
+            w.Notify(name, 1);
 
             await Task.Delay(rng.Next(500, 2000));
-            w.Notify(name);
+            w.Notify(name, 2);
         })).ToList();
 
         await Task.WhenAll(perApp);

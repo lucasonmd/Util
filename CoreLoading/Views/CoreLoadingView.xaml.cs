@@ -31,7 +31,7 @@ internal partial class CoreLoadingView : UserControl
         return _tcs.Task;
     }
 
-    internal void Notify(string appName) => _vm?.Notify(appName);
+    internal void Notify(string appName, int stage) => _vm?.Notify(appName, stage);
 
     internal void NotifyCoreReady() => _vm?.NotifyCoreReady();
 
