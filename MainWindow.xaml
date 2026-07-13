@@ -2,47 +2,57 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:NumPadDemo.Controls"
-        Title="NumPad Demo" Height="480" Width="360">
+        Title="NumPad Demo" Height="560" Width="1000">
     <Window.Background>
         <SolidColorBrush Color="Black"/>
     </Window.Background>
 
     <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0"
-                   Text="팝업 NumPad (포커스 시 이 TextBox 바로 밑에 표시)"
-                   Foreground="White"
-                   Margin="0,0,0,4"/>
+        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+            <TextBlock Text="1) immediateApply=true, isPopup=false (임베디드, 즉시반영)"
+                       Foreground="White"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,4"/>
+            <TextBox x:Name="EmbeddedImmediateTextBox"
+                     Height="36"
+                     Margin="0,0,0,8"
+                     FontSize="18"
+                     VerticalContentAlignment="Center"
+                     Text="0"/>
+            <ContentControl x:Name="EmbeddedImmediateHost"/>
+        </StackPanel>
 
-        <TextBox x:Name="PopupTextBox"
-                 Grid.Row="1"
-                 Height="36"
-                 Margin="0,0,0,16"
-                 FontSize="18"
-                 VerticalContentAlignment="Center"
-                 Text="0"/>
+        <StackPanel Grid.Column="1" Margin="8,0,8,0">
+            <TextBlock Text="2) immediateApply=false, isPopup=false (임베디드, Committed 이벤트)"
+                       Foreground="White"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,4"/>
+            <TextBox x:Name="EmbeddedEventTextBox"
+                     Height="36"
+                     Margin="0,0,0,8"
+                     FontSize="18"
+                     VerticalContentAlignment="Center"
+                     Text="0"/>
+            <ContentControl x:Name="EmbeddedEventHost"/>
+        </StackPanel>
 
-        <TextBlock Grid.Row="2"
-                   Text="임베디드 NumPad (아래 고정 배치, 어떤 TextBox든 포커스 시 동기화)"
-                   Foreground="White"
-                   Margin="0,0,0,4"/>
-
-        <TextBox x:Name="EmbeddedTextBox"
-                 Grid.Row="3"
-                 Height="36"
-                 Margin="0,0,0,16"
-                 FontSize="18"
-                 VerticalContentAlignment="Center"
-                 Text="0"/>
-
-        <!-- NumPad is a UserControl: drop it into any Grid cell and it stretches to fit. -->
-        <controls:NumPad Grid.Row="4"/>
+        <StackPanel Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Top">
+            <TextBlock Text="3) immediateApply=true, isPopup=true (팝업, 등록 기반)"
+                       Foreground="White"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,4"/>
+            <TextBox x:Name="PopupTextBox"
+                     Height="36"
+                     Margin="0,0,0,8"
+                     FontSize="18"
+                     VerticalContentAlignment="Center"
+                     Text="0"/>
+        </StackPanel>
     </Grid>
 </Window>

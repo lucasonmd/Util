@@ -10,24 +10,16 @@ namespace NumPadDemo.Controls
 {
     public partial class NumPad : UserControl
     {
-        private const string DisplayTag = "NumPadDisplay";
-
         // Matches d:DesignWidth/d:DesignHeight in NumPad.xaml, used to keep the popup's
         // auto-computed height proportional to whatever width the caller ends up with.
         private const double DesignWidth = 260;
         private const double DesignHeight = 320;
 
-        private static readonly List<NumPad> Instances = new();
-        private static TextBox? _activeTextBox;
-
         private readonly bool _immediateApply;
         private readonly bool _isPopup;
         private readonly Popup? _popup;
-
-        static NumPad()
-        {
-            EventManager.RegisterClassHandler(typeof(TextBox), GotFocusEvent, new RoutedEventHandler(OnAnyTextBoxGotFocus));
-        }
+        private readonly HashSet<TextBox> _registeredTextBoxes = new();
+        private TextBox? _activeTextBox;
 
         public NumPad() : this(false, false)
         {
@@ -49,15 +41,31 @@ namespace NumPadDemo.Controls
                     AllowsTransparency = true,
                     PopupAnimation = PopupAnimation.Fade
                 };
-            }
 
-            Instances.Add(this);
-            Unloaded += (_, _) => Instances.Remove(this);
-
-            if (_activeTextBox != null)
-            {
-                DisplayTextBox.Text = _activeTextBox.Text;
-                DisplayTextBox.CaretIndex = _activeTextBox.Text.Length;
+                // StaysOpen=false auto-dismisses this popup on an outside click, but a
+                // click that lands somewhere non-focusable (e.g. bare window background)
+                // never fires GotFocus/LostFocus on the registered TextBox, so it would
+                // stay the FocusManager's logical focused element. Clicking it again would
+                // then not raise GotFocus and the popup would never reopen. Clearing it
+                // here whenever the popup closes (but only if nothing else already took
+                // focus) keeps that TextBox re-clickable.
+                //
+                // Note: deliberately not hooked off this.Unloaded. WPF's Popup unloads its
+                // Child every time the popup closes (not just when it's permanently
+                // disposed), so an Unloaded handler here would unsubscribe
+                // OnRegisteredTextBoxGotFocus after the very first close and the popup
+                // would never reopen for any registered TextBox again.
+                _popup.Closed += (_, _) =>
+                {
+                    if (_activeTextBox is TextBox activeTextBox)
+                    {
+                        var scope = FocusManager.GetFocusScope(activeTextBox);
+                        if (Equals(FocusManager.GetFocusedElement(scope), activeTextBox))
+                        {
+                            FocusManager.SetFocusedElement(scope, null);
+                        }
+                    }
+                };
             }
         }
 
@@ -79,24 +87,39 @@ namespace NumPadDemo.Controls
             SyncBuffer(value, value.Length);
         }
 
-        private static void OnAnyTextBoxGotFocus(object sender, RoutedEventArgs e)
+        // Each NumPad only reacts to the TextBoxes registered here, instead of every
+        // TextBox in the app - otherwise multiple NumPad instances end up mirroring
+        // whichever TextBox anywhere last had focus, stomping on each other's value.
+        public void RegisterTextBox(TextBox textBox)
         {
-            if (sender is not TextBox textBox || (textBox.Tag is string tag && tag == DisplayTag))
+            if (_registeredTextBoxes.Add(textBox))
+            {
+                textBox.GotFocus += OnRegisteredTextBoxGotFocus;
+            }
+        }
+
+        public void UnregisterTextBox(TextBox textBox)
+        {
+            if (_registeredTextBoxes.Remove(textBox))
+            {
+                textBox.GotFocus -= OnRegisteredTextBoxGotFocus;
+            }
+        }
+
+        private void OnRegisteredTextBoxGotFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is not TextBox textBox)
             {
                 return;
             }
 
             _activeTextBox = textBox;
+            DisplayTextBox.Text = textBox.Text;
+            DisplayTextBox.CaretIndex = textBox.Text.Length;
 
-            foreach (var numPad in Instances)
+            if (_isPopup)
             {
-                numPad.DisplayTextBox.Text = textBox.Text;
-                numPad.DisplayTextBox.CaretIndex = textBox.Text.Length;
-
-                if (numPad._isPopup)
-                {
-                    numPad.ShowPopupBelow(textBox);
-                }
+                ShowPopupBelow(textBox);
             }
         }
 
@@ -217,7 +240,20 @@ namespace NumPadDemo.Controls
 
             if (_popup != null)
             {
+                // Closing triggers the Closed handler above, which clears the TextBox's
+                // logical focus using its own (real) scope.
                 _popup.IsOpen = false;
+            }
+            else if (_activeTextBox is TextBox activeTextBox)
+            {
+                // Keyboard.ClearFocus() alone only clears keyboard focus; the TextBox
+                // stays the FocusManager's logical focused element, so clicking it again
+                // later wouldn't raise GotFocus again.
+                var scope = FocusManager.GetFocusScope(activeTextBox);
+                if (Equals(FocusManager.GetFocusedElement(scope), activeTextBox))
+                {
+                    FocusManager.SetFocusedElement(scope, null);
+                }
             }
         }
     }

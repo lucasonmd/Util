@@ -98,7 +98,6 @@
 
         <TextBox x:Name="DisplayTextBox"
                  Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="4"
-                 Tag="NumPadDisplay"
                  Text="0"
                  Style="{StaticResource DisplayTextBoxStyle}"/>
 
