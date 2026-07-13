@@ -11,18 +11,17 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBox x:Name="ValueTextBox1"
-                 Grid.Row="0"
-                 Height="36"
-                 Margin="0,0,0,8"
-                 FontSize="18"
-                 VerticalContentAlignment="Center"
-                 Text="0"/>
+        <TextBlock Grid.Row="0"
+                   Text="팝업 NumPad (포커스 시 이 TextBox 바로 밑에 표시)"
+                   Foreground="White"
+                   Margin="0,0,0,4"/>
 
-        <TextBox x:Name="ValueTextBox2"
+        <TextBox x:Name="PopupTextBox"
                  Grid.Row="1"
                  Height="36"
                  Margin="0,0,0,16"
@@ -30,7 +29,20 @@
                  VerticalContentAlignment="Center"
                  Text="0"/>
 
+        <TextBlock Grid.Row="2"
+                   Text="임베디드 NumPad (아래 고정 배치, 어떤 TextBox든 포커스 시 동기화)"
+                   Foreground="White"
+                   Margin="0,0,0,4"/>
+
+        <TextBox x:Name="EmbeddedTextBox"
+                 Grid.Row="3"
+                 Height="36"
+                 Margin="0,0,0,16"
+                 FontSize="18"
+                 VerticalContentAlignment="Center"
+                 Text="0"/>
+
         <!-- NumPad is a UserControl: drop it into any Grid cell and it stretches to fit. -->
-        <controls:NumPad Grid.Row="2"/>
+        <controls:NumPad Grid.Row="4"/>
     </Grid>
 </Window>
