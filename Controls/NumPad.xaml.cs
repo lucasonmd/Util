@@ -1,27 +1,62 @@
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace NumPadDemo.Controls
 {
     public partial class NumPad : UserControl
     {
+        private const string DisplayTag = "NumPadDisplay";
+
+        private static readonly List<NumPad> Instances = new();
         private static TextBox? _activeTextBox;
+
+        private readonly bool _immediateApply;
 
         static NumPad()
         {
             EventManager.RegisterClassHandler(typeof(TextBox), GotFocusEvent, new RoutedEventHandler(OnAnyTextBoxGotFocus));
         }
 
-        public NumPad()
+        public NumPad() : this(true)
         {
+        }
+
+        public NumPad(bool immediateApply)
+        {
+            _immediateApply = immediateApply;
             InitializeComponent();
+
+            Instances.Add(this);
+            Unloaded += (_, _) => Instances.Remove(this);
+        }
+
+        public bool ImmediateApply => _immediateApply;
+
+        public string GetTextValue()
+        {
+            return DisplayTextBox.Text;
+        }
+
+        public void SetTextValue(string value)
+        {
+            SyncBuffer(value, value.Length);
         }
 
         private static void OnAnyTextBoxGotFocus(object sender, RoutedEventArgs e)
         {
-            if (sender is TextBox textBox)
+            if (sender is not TextBox textBox || (textBox.Tag is string tag && tag == DisplayTag))
             {
-                _activeTextBox = textBox;
+                return;
+            }
+
+            _activeTextBox = textBox;
+
+            foreach (var numPad in Instances)
+            {
+                numPad.DisplayTextBox.Text = textBox.Text;
+                numPad.DisplayTextBox.CaretIndex = textBox.Text.Length;
             }
         }
 
@@ -35,72 +70,79 @@ namespace NumPadDemo.Controls
 
         private void DecimalButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_activeTextBox == null || _activeTextBox.Text.Contains('.'))
+            if (DisplayTextBox.Text.Contains('.'))
             {
                 return;
             }
 
-            Insert(_activeTextBox.Text.Length == 0 ? "0." : ".");
+            Insert(DisplayTextBox.Text.Length == 0 ? "0." : ".");
         }
 
         private void SignButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_activeTextBox == null)
-            {
-                return;
-            }
-
-            var text = _activeTextBox.Text;
-            _activeTextBox.Text = text.StartsWith("-") ? text[1..] : "-" + text;
-            _activeTextBox.CaretIndex = _activeTextBox.Text.Length;
+            var text = DisplayTextBox.Text;
+            var newText = text.StartsWith("-") ? text[1..] : "-" + text;
+            SyncBuffer(newText, newText.Length);
         }
 
         private void ClearButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_activeTextBox == null)
-            {
-                return;
-            }
-
-            _activeTextBox.Text = string.Empty;
+            SyncBuffer(string.Empty, 0);
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_activeTextBox == null)
-            {
-                return;
-            }
-
-            var caret = _activeTextBox.CaretIndex;
+            var caret = DisplayTextBox.CaretIndex;
             if (caret == 0)
             {
                 return;
             }
 
-            _activeTextBox.Text = _activeTextBox.Text.Remove(caret - 1, 1);
-            _activeTextBox.CaretIndex = caret - 1;
+            var newText = DisplayTextBox.Text.Remove(caret - 1, 1);
+            SyncBuffer(newText, caret - 1);
+        }
+
+        private void EnterButton_Click(object sender, RoutedEventArgs e)
+        {
+            CommitAndReleaseFocus();
         }
 
         private void Insert(string toInsert)
         {
-            if (_activeTextBox == null)
-            {
-                return;
-            }
-
-            var text = _activeTextBox.Text;
+            var text = DisplayTextBox.Text;
 
             if (text == "0" && toInsert != ".")
             {
-                _activeTextBox.Text = toInsert;
-                _activeTextBox.CaretIndex = _activeTextBox.Text.Length;
+                SyncBuffer(toInsert, toInsert.Length);
                 return;
             }
 
-            var caret = _activeTextBox.CaretIndex;
-            _activeTextBox.Text = text.Insert(caret, toInsert);
-            _activeTextBox.CaretIndex = caret + toInsert.Length;
+            var caret = DisplayTextBox.CaretIndex;
+            var newText = text.Insert(caret, toInsert);
+            SyncBuffer(newText, caret + toInsert.Length);
+        }
+
+        private void SyncBuffer(string newText, int caretIndex)
+        {
+            DisplayTextBox.Text = newText;
+            DisplayTextBox.CaretIndex = caretIndex;
+
+            if (_immediateApply && _activeTextBox != null)
+            {
+                _activeTextBox.Text = newText;
+                _activeTextBox.CaretIndex = caretIndex;
+            }
+        }
+
+        private void CommitAndReleaseFocus()
+        {
+            if (_activeTextBox != null)
+            {
+                _activeTextBox.Text = DisplayTextBox.Text;
+                _activeTextBox.CaretIndex = _activeTextBox.Text.Length;
+            }
+
+            Keyboard.ClearFocus();
         }
     }
 }
