@@ -29,12 +29,25 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="2"
                                 SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Grid>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border x:Name="pressOverlay"
+                                        Background="#FFFFFFFF"
+                                        CornerRadius="2"
+                                        Opacity="0"
+                                        IsHitTestVisible="False"/>
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#FF404040"/>
-                            </Trigger>
+                            <EventTrigger RoutedEvent="Button.Click">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="pressOverlay"
+                                                          Storyboard.TargetProperty="Opacity"
+                                                          From="0.35" To="0" Duration="0:0:0.15"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
