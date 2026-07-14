@@ -15,15 +15,14 @@ namespace NumPadDemo
 
             _embeddedImmediateNumPad.Height = 320;
             EmbeddedImmediateHost.Content = _embeddedImmediateNumPad;
-            _embeddedImmediateNumPad.RegisterTextBox(EmbeddedImmediateTextBox);
+            _embeddedImmediateNumPad.RegisterTextBox(new[] { EmbeddedImmediateTextBox });
 
             _embeddedEventNumPad.Height = 320;
             EmbeddedEventHost.Content = _embeddedEventNumPad;
             _embeddedEventNumPad.Committed += OnEmbeddedEventNumPadCommitted;
-            _embeddedEventNumPad.RegisterTextBox(EmbeddedEventTextBox);
+            _embeddedEventNumPad.RegisterTextBox(new[] { EmbeddedEventTextBox });
 
-            _popupNumPad.RegisterTextBox(PopupTextBox);
-            _popupNumPad.RegisterTextBox(PopupTextBox2);
+            _popupNumPad.RegisterTextBox(new[] { PopupTextBox, PopupTextBox2 });
         }
 
         private void OnEmbeddedEventNumPadCommitted(object? sender, NumPadCommitEventArgs e)

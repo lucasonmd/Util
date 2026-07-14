@@ -20,7 +20,6 @@ namespace NumPadDemo.Controls
         private readonly Popup? _popup;
         private readonly HashSet<TextBox> _registeredTextBoxes = new();
         private TextBox? _activeTextBox;
-        private bool _suppressFocusClearOnClose;
 
         public NumPad() : this(false, false)
         {
@@ -38,9 +37,7 @@ namespace NumPadDemo.Controls
                 {
                     Child = this,
                     Placement = PlacementMode.Bottom,
-                    StaysOpen = false,
-                    AllowsTransparency = true,
-                    PopupAnimation = PopupAnimation.Fade
+                    StaysOpen = false
                 };
 
                 // StaysOpen=false auto-dismisses this popup on an outside click, but a
@@ -58,11 +55,6 @@ namespace NumPadDemo.Controls
                 // would never reopen for any registered TextBox again.
                 _popup.Closed += (_, _) =>
                 {
-                    if (_suppressFocusClearOnClose)
-                    {
-                        return;
-                    }
-
                     if (_activeTextBox is TextBox activeTextBox)
                     {
                         var scope = FocusManager.GetFocusScope(activeTextBox);
@@ -96,19 +88,31 @@ namespace NumPadDemo.Controls
         // Each NumPad only reacts to the TextBoxes registered here, instead of every
         // TextBox in the app - otherwise multiple NumPad instances end up mirroring
         // whichever TextBox anywhere last had focus, stomping on each other's value.
-        public void RegisterTextBox(TextBox textBox)
+        public void RegisterTextBox(IEnumerable<TextBox> textBoxes)
         {
-            if (_registeredTextBoxes.Add(textBox))
+            foreach (var textBox in textBoxes)
             {
-                textBox.GotFocus += OnRegisteredTextBoxGotFocus;
+                if (_registeredTextBoxes.Add(textBox))
+                {
+                    textBox.GotFocus += OnRegisteredTextBoxGotFocus;
+
+                    if (_isPopup)
+                    {
+                        textBox.LostFocus += OnRegisteredTextBoxLostFocus;
+                    }
+                }
             }
         }
 
-        public void UnregisterTextBox(TextBox textBox)
+        public void UnregisterTextBox(IEnumerable<TextBox> textBoxes)
         {
-            if (_registeredTextBoxes.Remove(textBox))
+            foreach (var textBox in textBoxes)
             {
-                textBox.GotFocus -= OnRegisteredTextBoxGotFocus;
+                if (_registeredTextBoxes.Remove(textBox))
+                {
+                    textBox.GotFocus -= OnRegisteredTextBoxGotFocus;
+                    textBox.LostFocus -= OnRegisteredTextBoxLostFocus;
+                }
             }
         }
 
@@ -129,6 +133,37 @@ namespace NumPadDemo.Controls
             }
         }
 
+        private void OnRegisteredTextBoxLostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_popup == null)
+            {
+                return;
+            }
+
+            // Deferred so that, when focus is moving to another registered TextBox for
+            // this same popup, that TextBox's GotFocus (which runs synchronously right
+            // after this LostFocus, as part of the same focus change) has already
+            // updated _activeTextBox by the time this runs - in which case we leave the
+            // popup open and just repositioned, instead of closing then reopening it.
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (!ReferenceEquals(_activeTextBox, sender))
+                {
+                    // Either a different registered TextBox took over (ShowPopupBelow
+                    // already repositioned for it), or the popup's own DisplayTextBox
+                    // was clicked - neither should close the popup.
+                    return;
+                }
+
+                if (Equals(Keyboard.FocusedElement, DisplayTextBox))
+                {
+                    return;
+                }
+
+                _popup.IsOpen = false;
+            }, DispatcherPriority.Input);
+        }
+
         private void ShowPopupBelow(TextBox target)
         {
             if (_popup == null)
@@ -136,25 +171,30 @@ namespace NumPadDemo.Controls
                 return;
             }
 
-            var width = target.ActualWidth > 0 ? target.ActualWidth : DesignWidth;
+            // Never shrink below the design width: a numeric keypad's buttons need a
+            // minimum usable size regardless of how narrow the target TextBox is.
+            var width = Math.Max(target.ActualWidth, DesignWidth);
             var height = width * (DesignHeight / DesignWidth);
 
             Width = width;
             Height = height;
 
-            // If the popup is already open against a different registered TextBox,
-            // WPF doesn't reflow its position just because PlacementTarget changes -
-            // it keeps rendering at the old spot. Closing first forces a clean re-open
-            // at the new target below. Suppress the Closed handler's focus-clear here:
-            // the newly-focused TextBox (the one that triggered this call) must keep
-            // its focus, unlike a real user-driven close.
-            _suppressFocusClearOnClose = true;
-            _popup.IsOpen = false;
-            _suppressFocusClearOnClose = false;
-
             _popup.PlacementTarget = target;
             _popup.Width = width;
             _popup.Height = height;
+
+            if (_popup.IsOpen)
+            {
+                // WPF doesn't reflow the popup's position just because PlacementTarget
+                // changed while it's already open - it keeps rendering at the old spot.
+                // Nudging an offset forces it to recompute placement without actually
+                // closing/reopening, which would otherwise flicker every time focus
+                // moves between two registered TextBoxes.
+                var offset = _popup.HorizontalOffset;
+                _popup.HorizontalOffset = offset + 1;
+                _popup.HorizontalOffset = offset;
+                return;
+            }
 
             // GotFocus fires on mouse-down; opening synchronously here means the
             // matching mouse-up lands outside the popup and StaysOpen=false reads
