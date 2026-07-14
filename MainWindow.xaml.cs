@@ -23,6 +23,7 @@ namespace NumPadDemo
             _embeddedEventNumPad.RegisterTextBox(EmbeddedEventTextBox);
 
             _popupNumPad.RegisterTextBox(PopupTextBox);
+            _popupNumPad.RegisterTextBox(PopupTextBox2);
         }
 
         private void OnEmbeddedEventNumPadCommitted(object? sender, NumPadCommitEventArgs e)

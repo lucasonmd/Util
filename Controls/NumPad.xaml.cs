@@ -20,6 +20,7 @@ namespace NumPadDemo.Controls
         private readonly Popup? _popup;
         private readonly HashSet<TextBox> _registeredTextBoxes = new();
         private TextBox? _activeTextBox;
+        private bool _suppressFocusClearOnClose;
 
         public NumPad() : this(false, false)
         {
@@ -57,6 +58,11 @@ namespace NumPadDemo.Controls
                 // would never reopen for any registered TextBox again.
                 _popup.Closed += (_, _) =>
                 {
+                    if (_suppressFocusClearOnClose)
+                    {
+                        return;
+                    }
+
                     if (_activeTextBox is TextBox activeTextBox)
                     {
                         var scope = FocusManager.GetFocusScope(activeTextBox);
@@ -135,6 +141,16 @@ namespace NumPadDemo.Controls
 
             Width = width;
             Height = height;
+
+            // If the popup is already open against a different registered TextBox,
+            // WPF doesn't reflow its position just because PlacementTarget changes -
+            // it keeps rendering at the old spot. Closing first forces a clean re-open
+            // at the new target below. Suppress the Closed handler's focus-clear here:
+            // the newly-focused TextBox (the one that triggered this call) must keep
+            // its focus, unlike a real user-driven close.
+            _suppressFocusClearOnClose = true;
+            _popup.IsOpen = false;
+            _suppressFocusClearOnClose = false;
 
             _popup.PlacementTarget = target;
             _popup.Width = width;
