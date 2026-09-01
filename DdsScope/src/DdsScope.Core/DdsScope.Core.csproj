@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Version-neutral data model, capture pipeline and capture store.
+    Must never reference RTI Connext or DevExpress.
+  -->
+</Project>

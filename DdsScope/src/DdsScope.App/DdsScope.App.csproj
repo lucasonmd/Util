@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The only project allowed to reference DevExpress.
+
+    DevExpress usage is kept to APIs that exist in 24.2 as well as 26.1: GridControl +
+    TableView with explicit GridColumns, TreeListControl + TreeListView with ChildNodesPath,
+    and standard WPF for everything else.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>DdsScope.App</RootNamespace>
+    <AssemblyName>DdsScope</AssemblyName>
+    <ApplicationTitle>DdsScope</ApplicationTitle>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DevExpress.Wpf.Grid" Version="$(DevExpressVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DdsScope.Core\DdsScope.Core.csproj" />
+    <ProjectReference Include="..\DdsScope.Dds.Abstractions\DdsScope.Dds.Abstractions.csproj" />
+    <ProjectReference Include="..\DdsScope.Dds.Rti\DdsScope.Dds.Rti.csproj" />
+    <ProjectReference Include="..\DdsScope.Filtering\DdsScope.Filtering.csproj" />
+    <ProjectReference Include="..\DdsScope.Export\DdsScope.Export.csproj" />
+  </ItemGroup>
+
+</Project>

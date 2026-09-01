@@ -1,0 +1,243 @@
+<Window x:Class="DdsScope.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dxg="http://schemas.devexpress.com/winfx/2008/xaml/grid"
+        xmlns:vm="clr-namespace:DdsScope.App.ViewModels"
+        Title="DdsScope - DDS Capture Viewer"
+        Height="780" Width="1420"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <HierarchicalDataTemplate DataType="{x:Type vm:SampleDetailNode}" ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                <TextBlock Text=" = " Foreground="#999999" />
+                <TextBlock Text="{Binding Value}" />
+                <TextBlock Text="{Binding TypeName, StringFormat='  ({0})'}" Foreground="#AAAAAA" />
+            </StackPanel>
+        </HierarchicalDataTemplate>
+    </Window.Resources>
+
+    <DockPanel>
+
+        <!-- ============================ toolbar ============================ -->
+        <Border DockPanel.Dock="Top" Background="#F5F5F5" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Padding="8,6">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Domain" Style="{StaticResource ToolbarLabel}" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding DomainId, UpdateSourceTrigger=PropertyChanged}"
+                             Width="52" VerticalContentAlignment="Center" />
+                    <Button Content="Connect" Command="{Binding ConnectCommand}" Width="86" Margin="6,0,0,0" />
+                    <Button Content="Disconnect" Command="{Binding DisconnectCommand}" Width="86" Margin="4,0,0,0" />
+
+                    <Separator Margin="10,2" />
+
+                    <ToggleButton Content="View Pause" IsChecked="{Binding ViewPaused}" Width="90"
+                                  ToolTip="Freezes the grid. Reception and capture keep running." />
+                    <ToggleButton Content="Capture Pause" IsChecked="{Binding CapturePaused}" Width="100" Margin="4,0,0,0"
+                                  ToolTip="Stops storing samples. The domain stays connected and discovery keeps running." />
+                    <ToggleButton Content="Live Follow" IsChecked="{Binding LiveFollow}" Width="86" Margin="4,0,0,0"
+                                  ToolTip="While off, new samples are counted but not added, so the view cannot move." />
+
+                    <Separator Margin="10,2" />
+
+                    <Button Content="Clear" Command="{Binding ClearCommand}" Width="60" />
+                    <Button Content="Save CSV" Command="{Binding SaveCsvCommand}" Width="80" Margin="4,0,0,0" />
+
+                    <TextBlock Text="Memory" Style="{StaticResource ToolbarLabel}" />
+                    <ComboBox ItemsSource="{Binding MemoryLimits}" SelectedItem="{Binding MemoryLimit}"
+                              Width="86" VerticalContentAlignment="Center" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock Text="Search" Style="{StaticResource ToolbarLabel}" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding QuickSearchText, UpdateSourceTrigger=PropertyChanged, Delay=250}"
+                             Width="190" VerticalContentAlignment="Center"
+                             ToolTip="Matches topic, writer, field names, string and enum values; numeric values when the term is a number." />
+
+                    <TextBlock Text="Filter" Style="{StaticResource ToolbarLabel}" />
+                    <TextBox Text="{Binding DisplayFilterText, UpdateSourceTrigger=PropertyChanged, Delay=300}"
+                             Width="520" VerticalContentAlignment="Center" FontFamily="Consolas"
+                             ToolTip="e.g. topic == &quot;C_Rotational_Mount&quot; &amp;&amp; data.SourceID == 3 &amp;&amp; data.Info >= 10" />
+                    <Button Content="x" Command="{Binding ClearFilterCommand}" Width="24" Margin="2,0,0,0" />
+
+                    <TextBlock Text="{Binding FilterError}" Foreground="#C0392B" VerticalAlignment="Center" Margin="10,0,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasFilterError}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- =========================== status bar =========================== -->
+        <Border DockPanel.Dock="Bottom" Background="#F5F5F5" BorderBrush="#DDDDDD" BorderThickness="0,1,0,0" Padding="8,4">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <TextBlock Text="Topics" Style="{StaticResource StatusLabel}" />
+                    <TextBlock Text="{Binding TopicCount}" Style="{StaticResource StatusValue}" />
+                    <TextBlock Text="Writers" Style="{StaticResource StatusLabel}" />
+                    <TextBlock Text="{Binding WriterCount}" Style="{StaticResource StatusValue}" />
+                    <TextBlock Text="Rx" Style="{StaticResource StatusLabel}" />
+                    <TextBlock Text="{Binding RateText}" Style="{StaticResource StatusValue}" />
+                    <TextBlock Text="Stored" Style="{StaticResource StatusLabel}" />
+                    <TextBlock Text="{Binding StoredText}" Style="{StaticResource StatusValue}" />
+                    <TextBlock Text="Memory" Style="{StaticResource StatusLabel}" />
+                    <TextBlock Text="{Binding MemoryText}" Style="{StaticResource StatusValue}" />
+                    <TextBlock Text="DDS Lost" Style="{StaticResource StatusLabel}" />
+                    <TextBlock Text="{Binding DdsLostText}" Style="{StaticResource StatusValue}" />
+                    <TextBlock Text="Queue Drop" Style="{StaticResource StatusLabel}" />
+                    <TextBlock Text="{Binding QueueDropText}" Style="{StaticResource StatusValue}" />
+                    <TextBlock Text="Evicted" Style="{StaticResource StatusLabel}" />
+                    <TextBlock Text="{Binding EvictedText}" Style="{StaticResource StatusValue}" />
+                    <TextBlock Text="Paused" Style="{StaticResource StatusLabel}" />
+                    <TextBlock Text="{Binding PausedSkippedText}" Style="{StaticResource StatusValue}" />
+                </StackPanel>
+                <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
+
+        <!-- ============================= 3 panes ============================ -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="290" MinWidth="180" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="*" MinWidth="360" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="380" MinWidth="240" />
+            </Grid.ColumnDefinitions>
+
+            <!-- topic / writer tree -->
+            <DockPanel Grid.Column="0">
+                <Border DockPanel.Dock="Top" Padding="8,5" Background="#FAFAFA" BorderBrush="#EEEEEE" BorderThickness="0,0,0,1">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="All topics" Command="{Binding SelectAllTopicsCommand}"
+                                Padding="6,1" ToolTip="Clears the selection filter." />
+                        <TextBlock Text="TOPICS / WRITERS" FontWeight="SemiBold" Foreground="#777777" VerticalAlignment="Center" />
+                    </DockPanel>
+                </Border>
+
+                <dxg:TreeListControl x:Name="TopicTree"
+                                     ItemsSource="{Binding TopicTree}"
+                                     SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
+                                     AutoGenerateColumns="None">
+                    <dxg:TreeListControl.Columns>
+                        <dxg:TreeListColumn FieldName="Caption" Header="Name" Width="150" />
+                        <dxg:TreeListColumn FieldName="Detail" Header="Type / Participant" Width="150" />
+                    </dxg:TreeListControl.Columns>
+                    <dxg:TreeListControl.View>
+                        <dxg:TreeListView ChildNodesPath="Children"
+                                          TreeDerivationMode="ChildNodesSelector"
+                                          AllowEditing="False"
+                                          ShowNodeImages="False"
+                                          AutoWidth="True"
+                                          ExpandStateFieldName="IsExpanded"
+                                          NavigationStyle="Row" />
+                    </dxg:TreeListControl.View>
+                </dxg:TreeListControl>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="#EEEEEE" />
+
+            <!-- capture grid -->
+            <DockPanel Grid.Column="2">
+                <Border DockPanel.Dock="Top" Padding="8,5" Background="#FAFAFA" BorderBrush="#EEEEEE" BorderThickness="0,0,0,1">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right"
+                                Content="{Binding PendingBannerText}"
+                                Command="{Binding JumpToLatestCommand}"
+                                Padding="8,1"
+                                Background="#FDF3D0"
+                                ToolTip="Jump to the newest sample and resume live follow.">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasPendingRows}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <TextBlock Text="CAPTURE" FontWeight="SemiBold" Foreground="#777777" VerticalAlignment="Center" />
+                    </DockPanel>
+                </Border>
+
+                <dxg:GridControl x:Name="CaptureGrid"
+                                 ItemsSource="{Binding Rows}"
+                                 SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                                 AutoGenerateColumns="None">
+                    <dxg:GridControl.View>
+                        <dxg:TableView x:Name="CaptureView"
+                                       AllowEditing="False"
+                                       ShowGroupPanel="False"
+                                       AllowColumnFiltering="True"
+                                       AllowSorting="True"
+                                       NavigationStyle="Row"
+                                       AutoWidth="False"
+                                       ShowSearchPanelMode="Never" />
+                    </dxg:GridControl.View>
+                </dxg:GridControl>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="3" HorizontalAlignment="Stretch" Background="#EEEEEE" />
+
+            <!-- detail -->
+            <TabControl Grid.Column="4">
+                <TabItem Header="Sample Detail">
+                    <TreeView x:Name="DetailTree" ItemsSource="{Binding SampleDetail}" BorderThickness="0">
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem">
+                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                        <TreeView.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Filter == this value" Click="OnFilterEqualsClick" />
+                                <MenuItem Header="Filter != this value" Click="OnFilterNotEqualsClick" />
+                            </ContextMenu>
+                        </TreeView.ContextMenu>
+                    </TreeView>
+                </TabItem>
+
+                <TabItem Header="Writer">
+                    <dxg:GridControl ItemsSource="{Binding WriterDetail}" AutoGenerateColumns="None">
+                        <dxg:GridControl.Columns>
+                            <dxg:GridColumn FieldName="Group" Header="Group" Width="80" />
+                            <dxg:GridColumn FieldName="Name" Header="Property" Width="130" />
+                            <dxg:GridColumn FieldName="Value" Header="Value" Width="170" />
+                        </dxg:GridControl.Columns>
+                        <dxg:GridControl.View>
+                            <dxg:TableView AllowEditing="False" ShowGroupPanel="False" AutoWidth="True" NavigationStyle="Row" />
+                        </dxg:GridControl.View>
+                    </dxg:GridControl>
+                </TabItem>
+
+                <TabItem Header="Log">
+                    <ListBox ItemsSource="{Binding Diagnostics}" BorderThickness="0" HorizontalContentAlignment="Stretch">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,2">
+                                    <TextBlock FontWeight="SemiBold">
+                                        <Run Text="{Binding Severity, Mode=OneWay}" />
+                                        <Run Text=" - " />
+                                        <Run Text="{Binding Scope, Mode=OneWay}" />
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="#555555" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </DockPanel>
+</Window>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- CSV export. Runs off the capture path; no DDS vendor, no UI library. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\DdsScope.Core\DdsScope.Core.csproj" />
+  </ItemGroup>
+
+</Project>

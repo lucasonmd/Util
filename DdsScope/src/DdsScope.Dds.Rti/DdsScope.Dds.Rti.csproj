@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The ONLY project that references RTI Connext.
+
+    Everything version-specific about the middleware is confined here, so moving from
+    Connext 7.7 to 7.3.0 is a package swap plus, at worst, edits inside this project.
+    The API surface used is limited to what 7.3.0 already provides:
+      DomainParticipant, BuiltinSubscriber + PublicationBuiltinTopicData (incl. DynamicType),
+      DynamicType/DynamicData, WaitSet + StatusCondition, DataReader.Take.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="Rti.ConnextDds" Version="$(RtiConnextVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DdsScope.Dds.Abstractions\DdsScope.Dds.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

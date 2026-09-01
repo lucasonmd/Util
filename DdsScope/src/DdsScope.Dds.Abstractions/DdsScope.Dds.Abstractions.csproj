@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The DDS contract the application is written against. Contains no reference to any DDS
+    vendor: swapping RTI Connext 7.7 for 7.3 (or another vendor) must not touch this project.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\DdsScope.Core\DdsScope.Core.csproj" />
+  </ItemGroup>
+
+</Project>

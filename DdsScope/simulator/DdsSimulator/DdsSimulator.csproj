@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Test publisher for DdsScope. Independent of the viewer solution: it shares no code with
+    it and only needs RTI Connext.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>DdsSimulator</AssemblyName>
+    <RootNamespace>DdsSimulator</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rti.ConnextDds" Version="$(RtiConnextVersion)" />
+  </ItemGroup>
+
+</Project>

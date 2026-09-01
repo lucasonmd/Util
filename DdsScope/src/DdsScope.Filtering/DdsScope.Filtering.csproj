@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Display-filter engine and quick search. No DDS vendor, no UI library. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\DdsScope.Core\DdsScope.Core.csproj" />
+  </ItemGroup>
+
+</Project>
