@@ -237,18 +237,34 @@ public static class RtiSchemaBuilder
         };
     }
 
-    internal static PayloadValueKind MapKind(RtiTypeKind kind) => kind switch
+    internal static PayloadValueKind MapKind(RtiTypeKind kind)
     {
-        RtiTypeKind.Boolean => PayloadValueKind.Bool,
-        RtiTypeKind.Int8 or RtiTypeKind.Int16 or RtiTypeKind.Int32 or RtiTypeKind.Int64 => PayloadValueKind.Int,
-        RtiTypeKind.Uint8 or RtiTypeKind.Octet or RtiTypeKind.Uint16 or RtiTypeKind.UInt32 or RtiTypeKind.UInt64 => PayloadValueKind.UInt,
-        RtiTypeKind.Float32 or RtiTypeKind.Float64 or RtiTypeKind.Float128 => PayloadValueKind.Float,
-        RtiTypeKind.Char8 or RtiTypeKind.Char16 => PayloadValueKind.Char,
-        RtiTypeKind.Enumeration => PayloadValueKind.Enum,
-        RtiTypeKind.String or RtiTypeKind.WideString => PayloadValueKind.String,
-        RtiTypeKind.Array or RtiTypeKind.Sequence => PayloadValueKind.Collection,
-        _ => PayloadValueKind.Unsupported
-    };
+        // Int8 and Octet cannot be pattern labels: the 7.3.0 baseline does not define them.
+        // An unmapped kind would drop the field from the schema entirely, so they are matched
+        // by value first rather than left to the Unsupported arm.
+        if (kind == RtiKindCompat.Int8)
+        {
+            return PayloadValueKind.Int;
+        }
+
+        if (kind == RtiKindCompat.Octet)
+        {
+            return PayloadValueKind.UInt;
+        }
+
+        return kind switch
+        {
+            RtiTypeKind.Boolean => PayloadValueKind.Bool,
+            RtiTypeKind.Int16 or RtiTypeKind.Int32 or RtiTypeKind.Int64 => PayloadValueKind.Int,
+            RtiTypeKind.Uint8 or RtiTypeKind.Uint16 or RtiTypeKind.UInt32 or RtiTypeKind.UInt64 => PayloadValueKind.UInt,
+            RtiTypeKind.Float32 or RtiTypeKind.Float64 or RtiTypeKind.Float128 => PayloadValueKind.Float,
+            RtiTypeKind.Char8 or RtiTypeKind.Char16 => PayloadValueKind.Char,
+            RtiTypeKind.Enumeration => PayloadValueKind.Enum,
+            RtiTypeKind.String or RtiTypeKind.WideString => PayloadValueKind.String,
+            RtiTypeKind.Array or RtiTypeKind.Sequence => PayloadValueKind.Collection,
+            _ => PayloadValueKind.Unsupported
+        };
+    }
 
     /// <summary>Accumulates fields and hands out slot indices while the plan is built.</summary>
     private sealed class BuildState

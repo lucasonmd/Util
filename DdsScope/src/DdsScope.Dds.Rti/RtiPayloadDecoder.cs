@@ -133,10 +133,6 @@ internal sealed class RtiPayloadDecoder
                 builder.SetBool(field, data.GetValue<bool>(node.Name));
                 break;
 
-            case RtiTypeKind.Int8:
-                builder.SetInt64(field, data.GetValue<sbyte>(node.Name));
-                break;
-
             case RtiTypeKind.Int16:
                 builder.SetInt64(field, data.GetValue<short>(node.Name));
                 break;
@@ -150,7 +146,6 @@ internal sealed class RtiPayloadDecoder
                 break;
 
             case RtiTypeKind.Uint8:
-            case RtiTypeKind.Octet:
                 builder.SetUInt64(field, data.GetValue<byte>(node.Name));
                 break;
 
@@ -188,8 +183,22 @@ internal sealed class RtiPayloadDecoder
                 builder.SetString(field, data.GetValue<string>(node.Name));
                 break;
 
+            // Int8 and Octet are not switch labels because the 7.3.0 baseline does not
+            // define them. Compared by value they cost one branch on a rare kind.
             default:
-                ReadLeafFallback(data, node, field);
+                if (node.LeafKind == RtiKindCompat.Int8)
+                {
+                    builder.SetInt64(field, data.GetValue<sbyte>(node.Name));
+                }
+                else if (node.LeafKind == RtiKindCompat.Octet)
+                {
+                    builder.SetUInt64(field, data.GetValue<byte>(node.Name));
+                }
+                else
+                {
+                    ReadLeafFallback(data, node, field);
+                }
+
                 break;
         }
     }
