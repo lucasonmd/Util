@@ -58,6 +58,7 @@ public sealed class RtiDdsConnection : IDdsConnection
     private GuardCondition receiveWakeup;
     private Thread discoveryThread;
     private Thread receiveThread;
+    private bool started;
 
     private readonly Dictionary<Condition, TopicEntry> entriesByCondition = new();
 
@@ -88,6 +89,17 @@ public sealed class RtiDdsConnection : IDdsConnection
 
     public void Start()
     {
+        // Idempotent on purpose. A second call used to create a second receive thread and a
+        // second discovery thread; two threads waiting on one WaitSet is a precondition
+        // violation in Connext, so the loser threw on every wait, logged an error and slept
+        // 100 ms - which cost roughly two thirds of the incoming samples.
+        if (started)
+        {
+            return;
+        }
+
+        started = true;
+
         // Connext 7.x ships with type_code_max_serialized_length = 0, i.e. it neither sends
         // nor stores the type information carried by discovery. Without this the tool learns
         // topic and type NAMES but never a type it can decode with.
@@ -157,7 +169,7 @@ public sealed class RtiDdsConnection : IDdsConnection
             }
             catch (Exception ex) when (!token.IsCancellationRequested)
             {
-                Report(DiagnosticSeverity.Error, "discovery", ex.Message);
+                Report(DiagnosticSeverity.Error, "discovery", Describe(ex));
             }
 
             token.WaitHandle.WaitOne(DiscoveryPollInterval);
@@ -183,7 +195,7 @@ public sealed class RtiDdsConnection : IDdsConnection
             catch (Exception ex)
             {
                 // One malformed announcement must not stop discovery of the rest.
-                Report(DiagnosticSeverity.Warning, "discovery", ex.Message);
+                Report(DiagnosticSeverity.Warning, "discovery", Describe(ex));
             }
         }
     }
@@ -334,7 +346,7 @@ public sealed class RtiDdsConnection : IDdsConnection
         catch (Exception ex)
         {
             entry.Info.TypeState = TopicTypeState.Unavailable;
-            entry.Info.TypeStateDetail = "Type could not be interpreted: " + ex.Message;
+            entry.Info.TypeStateDetail = "Type could not be interpreted: " + Describe(ex);
             TopicUpdated?.Invoke(entry.Info);
             Report(DiagnosticSeverity.Warning, entry.Info.TopicName, entry.Info.TypeStateDetail);
         }
@@ -389,7 +401,7 @@ public sealed class RtiDdsConnection : IDdsConnection
             catch (Exception ex)
             {
                 Report(DiagnosticSeverity.Error, entry.Info.TopicName,
-                    "Could not create a reader: " + ex.Message);
+                    "Could not create a reader: " + Describe(ex));
             }
         }
     }
@@ -506,7 +518,7 @@ public sealed class RtiDdsConnection : IDdsConnection
             }
             catch (Exception ex) when (!token.IsCancellationRequested)
             {
-                Report(DiagnosticSeverity.Error, "receive", ex.Message);
+                Report(DiagnosticSeverity.Error, "receive", Describe(ex));
                 Thread.Sleep(100);
             }
         }
@@ -524,7 +536,7 @@ public sealed class RtiDdsConnection : IDdsConnection
             }
             catch (Exception ex)
             {
-                Report(DiagnosticSeverity.Warning, "receive", ex.Message);
+                Report(DiagnosticSeverity.Warning, "receive", Describe(ex));
             }
         }
     }
@@ -566,7 +578,7 @@ public sealed class RtiDdsConnection : IDdsConnection
         catch (Exception ex)
         {
             // Failure is isolated to this topic; every other reader keeps running.
-            Report(DiagnosticSeverity.Error, entry.Info.TopicName, ex.Message);
+            Report(DiagnosticSeverity.Error, entry.Info.TopicName, Describe(ex));
         }
     }
 
@@ -634,6 +646,29 @@ public sealed class RtiDdsConnection : IDdsConnection
 
     private void Report(DiagnosticSeverity severity, string scope, string message) =>
         Diagnostic?.Invoke(new DdsDiagnostic(severity, scope, message));
+
+    /// <summary>
+    /// Text for a diagnostic raised from an exception.
+    ///
+    /// Several Connext exceptions carry an empty Message, which reached the Log pane as a
+    /// bare severity with nothing to act on. The type name is always included so a repeating
+    /// failure can at least be identified.
+    /// </summary>
+    private static string Describe(Exception ex)
+    {
+        if (ex == null)
+        {
+            return "(no exception)";
+        }
+
+        var message = ex.Message;
+        var inner = ex.InnerException;
+        var detail = string.IsNullOrWhiteSpace(message)
+            ? ex.GetType().FullName
+            : ex.GetType().Name + ": " + message;
+
+        return inner == null ? detail : detail + " -> " + Describe(inner);
+    }
 
     // ----------------------------------------------------------------- shutdown
 

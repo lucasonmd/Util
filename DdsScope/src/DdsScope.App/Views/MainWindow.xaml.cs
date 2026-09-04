@@ -22,6 +22,7 @@ public partial class MainWindow : Window
 
         DataContext = viewModel;
         viewModel.ColumnsChanged += RebuildColumns;
+        viewModel.ScrollToTopRequested += ScrollCaptureToTop;
         viewModel.RequestSavePath = AskForCsvPath;
 
         // Any deliberate interaction with the grid stops live follow, so the row the user is
@@ -43,6 +44,24 @@ public partial class MainWindow : Window
         }
 
         Closed += (_, _) => viewModel.Dispose();
+    }
+
+    /// <summary>
+    /// Pins the capture grid to the newest row while live follow is on.
+    ///
+    /// Inserting at the top otherwise makes the grid hold the row that was already in view,
+    /// so the newest samples pile up above the viewport and the user drifts away from the
+    /// live tail without having scrolled. Any deliberate scroll, click or key turns live
+    /// follow off first, so this never fights the user.
+    /// </summary>
+    private void ScrollCaptureToTop()
+    {
+        if (!viewModel.LiveFollow || CaptureView.TopRowIndex == 0)
+        {
+            return;
+        }
+
+        CaptureView.TopRowIndex = 0;
     }
 
     private void OnGridKeyDown(object sender, KeyEventArgs e)

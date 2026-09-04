@@ -22,12 +22,17 @@ public sealed class RtiDdsRuntime : IDdsRuntime
         }
     }
 
-    public IDdsConnection Connect(DdsConnectionOptions options, ICaptureSink sink)
-    {
-        var connection = new RtiDdsConnection(options, sink);
-        connection.Start();
-        return connection;
-    }
+    /// <summary>
+    /// Joins the domain but does NOT start discovery: the caller has to subscribe to the
+    /// discovery events first and then call <see cref="IDdsConnection.Start"/>.
+    ///
+    /// Starting here raced the caller. Built-in discovery delivers every writer that is
+    /// already online in its first poll, so against publishers that were up before the tool
+    /// those events fired with nothing attached and, since discovery does not re-announce
+    /// them, the topic tree stayed empty for the whole session.
+    /// </summary>
+    public IDdsConnection Connect(DdsConnectionOptions options, ICaptureSink sink) =>
+        new RtiDdsConnection(options, sink);
 
     public void Dispose()
     {

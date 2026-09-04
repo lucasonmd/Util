@@ -140,6 +140,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the grid should rebuild its columns for a new payload schema.</summary>
     public event Action<PayloadSchema> ColumnsChanged;
 
+    /// <summary>
+    /// Raised after rows were applied while live follow is on, so the view can pin the
+    /// viewport to the newest sample. Nothing else scrolls the grid: with rows inserted at
+    /// the top the grid keeps the row the user was looking at, which is right when they are
+    /// reading and wrong when they asked to follow the live tail.
+    /// </summary>
+    public event Action ScrollToTopRequested;
+
     /// <summary>Asks the view for a CSV destination. Returns null when the user cancels.</summary>
     public Func<string, string> RequestSavePath { get; set; }
 
@@ -387,6 +395,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             connection.WriterUpdated += OnWriterUpdated;
             connection.Diagnostic += OnDiagnostic;
 
+            // Only now, with every handler attached: discovery reports the writers that are
+            // already online exactly once, and anything reported before this line is lost.
+            connection.Start();
+
             IsConnected = true;
             StatusMessage = $"Connected to domain {DomainId}.";
         }
@@ -612,6 +624,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
         // fresh is newest-first; the collection batches the notifications for a large burst.
         Rows.PrependAndTrim(fresh, MaxDisplayedRows);
+        ScrollToTopRequested?.Invoke();
     }
 
     private void JumpToLatest()
@@ -671,6 +684,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
                 lastProjectedSequence = Math.Max(lastProjectedSequence, newest);
                 PendingNewCount = 0;
+
+                if (liveFollow)
+                {
+                    ScrollToTopRequested?.Invoke();
+                }
             }));
         });
     }
