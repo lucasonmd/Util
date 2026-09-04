@@ -61,6 +61,14 @@ public partial class MainWindow : Window
     /// </summary>
     private void RebuildColumns(PayloadSchema schema)
     {
+        // Selecting another writer of the same topic, or a topic whose type was already
+        // resolved, hands back the same schema instance. Rebuilding the columns for it would
+        // throw away the user's column widths and order for no change in content.
+        if (ReferenceEquals(currentSchema, schema) && CaptureGrid.Columns.Count > 0)
+        {
+            return;
+        }
+
         currentSchema = schema;
         CaptureGrid.Columns.Clear();
 

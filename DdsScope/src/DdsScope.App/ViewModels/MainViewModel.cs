@@ -109,7 +109,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     // ------------------------------------------------------------- collections
 
-    public ObservableCollection<CaptureRowViewModel> Rows { get; } = new();
+    public CaptureRowCollection Rows { get; } = new();
 
     public ObservableCollection<TopicNodeViewModel> TopicTree { get; } = new();
 
@@ -610,16 +610,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
-        // fresh is newest-first; inserting from the back leaves the newest sample on top.
-        for (var i = fresh.Count - 1; i >= 0; i--)
-        {
-            Rows.Insert(0, fresh[i]);
-        }
-
-        while (Rows.Count > MaxDisplayedRows)
-        {
-            Rows.RemoveAt(Rows.Count - 1);
-        }
+        // fresh is newest-first; the collection batches the notifications for a large burst.
+        Rows.PrependAndTrim(fresh, MaxDisplayedRows);
     }
 
     private void JumpToLatest()
@@ -675,11 +667,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                     return;
                 }
 
-                Rows.Clear();
-                foreach (var row in rows)
-                {
-                    Rows.Add(row);
-                }
+                Rows.ResetTo(rows);
 
                 lastProjectedSequence = Math.Max(lastProjectedSequence, newest);
                 PendingNewCount = 0;
@@ -719,7 +707,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
 
         ColumnsChanged?.Invoke(schema);
-        queryDirty = true;
+
+        // Selection is a direct click, so it refreshes now rather than on the next tick:
+        // the scan runs off the UI thread anyway, and a deferred rebuild made the grid look
+        // frozen for up to one tick after every click. Typed filters stay coalesced.
+        queryDirty = false;
+        RebuildRows();
     }
 
     /// <summary>Appends a term to the display filter, used by the payload context menu.</summary>
