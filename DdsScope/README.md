@@ -162,13 +162,15 @@ simulator\DdsSimulatorin\Debug
 et8.0\DdsSimulator.exe --domain 0 --rate 200
 ```
 
-It publishes three topics that resemble the target traffic:
+It publishes five topics that resemble the target traffic:
 
 | Topic | Shape | Reliability |
 | --- | --- | --- |
 | `C_Rotational_Mount` | keyed struct, ints, doubles, an enum | RELIABLE |
 | `C_Platform_State` | keyed struct, string, nested `Position` struct | BEST_EFFORT |
 | `C_Track_Report` | keyed struct, `sequence<long, 16>` | RELIABLE |
+| `C_Source_List` | keyed struct, `char[8]`, `sequence<SourceId, 8>` (struct elements) | RELIABLE |
+| `C_Sensor_Wide` | 27 members over every primitive, an enum, a nested struct, a sequence | RELIABLE |
 
 The mixed reliability is deliberate: it exercises the viewer's per-topic reader QoS derivation.
 

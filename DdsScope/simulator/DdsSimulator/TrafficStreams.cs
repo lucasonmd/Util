@@ -35,6 +35,12 @@ public sealed class TrafficStream
 /// </summary>
 public static class TrafficStreams
 {
+    /// <summary>Width of the char array Label, wider than any value written into it.</summary>
+    private const int LabelWidth = 8;
+
+    /// <summary>Elements written into the SourceId sequence; fixed, see CreateSourceList.</summary>
+    private const int SourceCount = 3;
+
     /// <summary>
     /// Participant QoS a publisher needs for its types to be visible to a debug viewer.
     ///
@@ -56,6 +62,7 @@ public static class TrafficStreams
             CreateMount(participant, publisher, factory),
             CreatePlatform(participant, publisher, factory),
             CreateTrack(participant, publisher, factory),
+            CreateSourceList(participant, publisher, factory),
             CreateWideSensor(participant, publisher, factory)
         };
     }
@@ -166,6 +173,70 @@ public static class TrafficStreams
 
             sample.SetAnyValue("Samples", points);
         });
+    }
+
+    /// <summary>
+    /// The two payload shapes a viewer cannot be trusted on until it has seen them: a sequence
+    /// whose elements are structs, and a char array standing in for a string.
+    ///
+    /// Neither can be read the way a sequence of primitives is - GetAnyValue understands
+    /// primitives only - so this topic is what proves the decoder's element path and its char
+    /// handling without needing the real system on the wire.
+    /// </summary>
+    private static TrafficStream CreateSourceList(DomainParticipant participant, Publisher publisher, DynamicTypeFactory factory)
+    {
+        var sourceId = factory.BuildStruct()
+            .WithName("SourceId")
+            .AddMember(new StructMember("SystemID", factory.GetPrimitiveType<int>()))
+            .AddMember(new StructMember("NodeID", factory.GetPrimitiveType<int>()))
+            .Create();
+
+        var type = factory.BuildStruct()
+            .WithName("C_Source_List")
+            .AddMember(new StructMember("TrackID", factory.GetPrimitiveType<int>(), isKey: true))
+            // A char array rather than CreateString on purpose: the viewer has to render this
+            // as text and not as a list of letters.
+            .AddMember(new StructMember("Label", factory.CreateArray(factory.GetPrimitiveType<char>(), LabelWidth)))
+            .AddMember(new StructMember("Sources", factory.CreateSequence(sourceId, 8)))
+            .Create();
+
+        var topic = participant.CreateTopic("C_Source_List", type);
+        var writer = publisher.CreateDataWriter(topic);
+        var counter = 0;
+
+        return new TrafficStream("C_Source_List", writer, sample =>
+        {
+            counter++;
+            sample.SetValue("TrackID", 300 + counter % 3);
+
+            // Always shorter than the array, so every sample carries the NUL padding a real
+            // fixed-width char array carries and the viewer has to trim.
+            SetLabel(sample, "trk-" + counter % 10);
+
+            // The element count is fixed on purpose. A DynamicData sequence keeps the length
+            // of the longest sample written into it, and this sample is reused across writes,
+            // so a varying count would publish stale elements that nothing set this round.
+            using var sources = sample.LoanValue("Sources");
+            for (uint i = 1; i <= SourceCount; i++)
+            {
+                // Writing element i is what grows the sequence to length i.
+                using var element = sources.Data.LoanValueByIndex(i);
+                element.Data.SetValue("SystemID", (int)i);
+                element.Data.SetValue("NodeID", counter + (int)i);
+            }
+        });
+    }
+
+    /// <summary>Fills a fixed-width char array the way a C publisher would: NUL-padded.</summary>
+    private static void SetLabel(DynamicData sample, string value)
+    {
+        var label = new char[LabelWidth];
+        for (var i = 0; i < label.Length; i++)
+        {
+            label[i] = i < value.Length ? value[i] : '\0';
+        }
+
+        sample.SetAnyValue("Label", label);
     }
 
     /// <summary>
