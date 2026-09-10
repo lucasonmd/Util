@@ -9,7 +9,10 @@ internal enum ReadNodeKind
     Struct,
     Union,
     Leaf,
-    Collection
+    Collection,
+
+    /// <summary><c>char[N]</c> and <c>sequence&lt;char&gt;</c>, captured as text.</summary>
+    CharArray
 }
 
 /// <summary>
@@ -25,6 +28,9 @@ internal sealed class ElementNode
 
     /// <summary>True when the member is itself a struct or union and must be loaned.</summary>
     public bool IsAggregate { get; init; }
+
+    /// <summary>True when the member is <c>char[N]</c> or <c>sequence&lt;char&gt;</c>.</summary>
+    public bool IsCharArray { get; init; }
 
     /// <summary>Resolved IDL kind of a leaf member.</summary>
     public RtiTypeKind LeafKind { get; init; }
@@ -255,6 +261,17 @@ public static class RtiSchemaBuilder
 
     private static ReadNode MakeLeafOrCollection(string name, DynamicType type, PayloadField field)
     {
+        if (IsCharacterArray(type))
+        {
+            return new ReadNode
+            {
+                Name = name,
+                Kind = ReadNodeKind.CharArray,
+                Field = field,
+                LeafKind = type.Kind
+            };
+        }
+
         var isCollection = type.Kind is RtiTypeKind.Array or RtiTypeKind.Sequence;
 
         return new ReadNode
@@ -265,6 +282,24 @@ public static class RtiSchemaBuilder
             LeafKind = type.Kind,
             ElementMembers = isCollection ? BuildElementMembers(ElementTypeOf(type), 0) : null
         };
+    }
+
+    /// <summary>
+    /// True for <c>char[N]</c> and <c>sequence&lt;char&gt;</c>.
+    ///
+    /// IDL uses a char array where other languages use a string, so one is captured as text
+    /// rather than as a list of letters: <c>abc</c>, not <c>[a, b, c]</c>. That also makes it
+    /// filterable and exportable the way an IDL string already is.
+    /// </summary>
+    private static bool IsCharacterArray(DynamicType type)
+    {
+        if (type.Kind is not (RtiTypeKind.Array or RtiTypeKind.Sequence))
+        {
+            return false;
+        }
+
+        var element = ElementTypeOf(type);
+        return element != null && element.Kind is RtiTypeKind.Char8 or RtiTypeKind.Char16;
     }
 
     /// <summary>The element type of an array or sequence, with aliases resolved.</summary>
@@ -320,8 +355,14 @@ public static class RtiSchemaBuilder
                 continue;
             }
 
-            // A collection nested inside an element is left out on purpose: the detail pane
-            // shows one level of elements, and a sequence of sequences has no flat rendering.
+            if (IsCharacterArray(resolved))
+            {
+                nodes.Add(new ElementNode { Name = member.Key, IsCharArray = true });
+                continue;
+            }
+
+            // Any other collection nested inside an element is left out on purpose: the detail
+            // pane shows one level of elements, and a sequence of sequences has no flat rendering.
             if (resolved.Kind is RtiTypeKind.Array or RtiTypeKind.Sequence ||
                 MapKind(resolved.Kind) == PayloadValueKind.Unsupported)
             {
@@ -433,6 +474,11 @@ public static class RtiSchemaBuilder
             if (kind == PayloadValueKind.Unsupported)
             {
                 return null;
+            }
+
+            if (kind == PayloadValueKind.Collection && IsCharacterArray(type))
+            {
+                kind = PayloadValueKind.String;
             }
 
             var slot = kind switch

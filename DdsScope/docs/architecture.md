@@ -119,6 +119,11 @@ returns. When neither path can read the elements, `CollectionValue.Truncation` r
 `Unreadable` rather than `ElementCap`, so the detail pane does not report an undecodable type as
 one that outgrew the cap.
 
+**A char collection is text, not a collection.** IDL uses `char name[32]` where other languages
+use a string, so `char[N]` and `sequence<char>` are given a string slot and captured as `abc`
+rather than `[a, b, c]` — filterable and exportable as the text they are. Fixed arrays are
+padded to their declared width, and the padding is dropped at the first NUL.
+
 Strings that would be expensive and are rarely read — the instance key, the payload summary —
 are computed lazily by `CaptureRecord`, when a grid cell or CSV row actually asks.
 

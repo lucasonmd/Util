@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Globalization;
+using System.Text;
 using DdsScope.Core.Payload;
 using Rti.Types.Dynamic;
 using RtiTypeKind = Omg.Types.Dynamic.TypeKind;
@@ -83,6 +84,10 @@ internal sealed class RtiPayloadDecoder
 
             case ReadNodeKind.Collection:
                 ReadCollection(data, child);
+                break;
+
+            case ReadNodeKind.CharArray:
+                ReadCharArray(data, child);
                 break;
 
             default:
@@ -227,6 +232,93 @@ internal sealed class RtiPayloadDecoder
     }
 
     /// <summary>
+    /// Captures <c>char[N]</c> and <c>sequence&lt;char&gt;</c> as text.
+    ///
+    /// IDL uses a char array where other languages use a string, so the sample reads as
+    /// <c>abc</c> rather than <c>[a, b, c]</c>, and the value is filtered and exported as the
+    /// text it is. The schema already assigns such a field a string slot.
+    /// </summary>
+    private void ReadCharArray(DynamicData data, ReadNode node)
+    {
+        var field = node.Field;
+        if (field == null)
+        {
+            return;
+        }
+
+        if (field.IsOptional && !data.MemberExists(node.Name))
+        {
+            return;
+        }
+
+        string text;
+        try
+        {
+            text = AsText(data.GetAnyValue(node.Name));
+        }
+        catch (Exception)
+        {
+            // One unreadable field must not cost us the rest of the sample.
+            return;
+        }
+
+        if (text != null)
+        {
+            builder.SetString(field, text);
+        }
+    }
+
+    /// <summary>Renders whatever shape a char collection arrives in as a string.</summary>
+    private static string AsText(object raw)
+    {
+        switch (raw)
+        {
+            case null:
+                return null;
+
+            case string text:
+                return TrimPadding(text);
+
+            case char[] chars:
+                return TrimPadding(new string(chars));
+        }
+
+        if (raw is not IEnumerable enumerable)
+        {
+            return null;
+        }
+
+        // Named apart from the snapshot builder this class writes into, which it is not.
+        var result = new StringBuilder();
+        foreach (var element in enumerable)
+        {
+            switch (element)
+            {
+                case char c:
+                    result.Append(c);
+                    break;
+
+                // Char8 can arrive as its numeric kind, which is the same character.
+                case IConvertible convertible:
+                    result.Append((char)convertible.ToInt32(CultureInfo.InvariantCulture));
+                    break;
+            }
+        }
+
+        return TrimPadding(result.ToString());
+    }
+
+    /// <summary>
+    /// A fixed-width char array is padded to its declared length. The padding is not part of
+    /// the value, and rendering it would put stray NULs in the grid and the CSV.
+    /// </summary>
+    private static string TrimPadding(string value)
+    {
+        var end = value.IndexOf('\0');
+        return end < 0 ? value : value[..end];
+    }
+
+    /// <summary>
     /// Arrays and sequences are recorded by length, and their elements copied only while the
     /// element count stays under the configured cap. That is what stops a
     /// <c>sequence&lt;octet, 3000000&gt;</c> from being materialised on the receive thread.
@@ -345,6 +437,11 @@ internal sealed class RtiPayloadDecoder
     /// </summary>
     private static object ReadElementLeaf(DynamicData data, ElementNode member)
     {
+        if (member.IsCharArray)
+        {
+            return AsText(data.GetAnyValue(member.Name));
+        }
+
         switch (member.LeafKind)
         {
             case RtiTypeKind.Boolean:
