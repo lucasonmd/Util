@@ -13,6 +13,29 @@ internal enum ReadNodeKind
 }
 
 /// <summary>
+/// One member of a collection's element type.
+///
+/// A sequence of primitives is read as a block, but a <c>sequence&lt;SourceId&gt;</c> cannot be:
+/// its elements are aggregates that have to be loaned and walked one at a time. The element
+/// type therefore gets its own small plan, built once with the schema.
+/// </summary>
+internal sealed class ElementNode
+{
+    public string Name { get; init; }
+
+    /// <summary>True when the member is itself a struct or union and must be loaned.</summary>
+    public bool IsAggregate { get; init; }
+
+    /// <summary>Resolved IDL kind of a leaf member.</summary>
+    public RtiTypeKind LeafKind { get; init; }
+
+    /// <summary>Label table for enum members; null otherwise.</summary>
+    public IReadOnlyDictionary<long, string> EnumLabels { get; init; }
+
+    public ElementNode[] Children { get; init; } = Array.Empty<ElementNode>();
+}
+
+/// <summary>
 /// One step of the decode plan for a payload type.
 ///
 /// The plan is built once per discovered type. Decoding a sample then walks a small tree of
@@ -34,6 +57,12 @@ internal sealed class ReadNode
 
     /// <summary>Populated for unions, where only the active member is decoded.</summary>
     public Dictionary<string, ReadNode> ChildrenByName { get; init; }
+
+    /// <summary>
+    /// Members of the element type, for a collection whose elements are structs or unions.
+    /// Null for collections of primitives, which are read as a block.
+    /// </summary>
+    public ElementNode[] ElementMembers { get; init; }
 }
 
 /// <summary>A discovered type: the neutral schema plus the plan used to fill it.</summary>
@@ -233,8 +262,131 @@ public static class RtiSchemaBuilder
             Name = name,
             Kind = isCollection ? ReadNodeKind.Collection : ReadNodeKind.Leaf,
             Field = field,
-            LeafKind = type.Kind
+            LeafKind = type.Kind,
+            ElementMembers = isCollection ? BuildElementMembers(ElementTypeOf(type), 0) : null
         };
+    }
+
+    /// <summary>The element type of an array or sequence, with aliases resolved.</summary>
+    private static DynamicType ElementTypeOf(DynamicType type) => type switch
+    {
+        SequenceType sequence => Resolve(sequence.ContentType as DynamicType),
+        ArrayType array => Resolve(array.ContentType as DynamicType),
+        _ => null
+    };
+
+    /// <summary>
+    /// The plan for one element of a collection of aggregates, or null when the elements are
+    /// primitives - read as a block - or of a shape with no useful flat rendering. Null is what
+    /// tells the decoder to take the cheap block path.
+    /// </summary>
+    private static ElementNode[] BuildElementMembers(DynamicType elementType, int depth)
+    {
+        if (depth >= MaxDepth)
+        {
+            return null;
+        }
+
+        var members = MembersOf(elementType);
+        if (members == null)
+        {
+            return null;
+        }
+
+        var nodes = new List<ElementNode>(members.Count);
+        foreach (var member in members)
+        {
+            var resolved = Resolve(member.Value);
+            if (resolved == null)
+            {
+                continue;
+            }
+
+            if (resolved.Kind is RtiTypeKind.Structure or RtiTypeKind.Union)
+            {
+                var children = BuildElementMembers(resolved, depth + 1);
+                if (children == null)
+                {
+                    continue;
+                }
+
+                nodes.Add(new ElementNode
+                {
+                    Name = member.Key,
+                    IsAggregate = true,
+                    Children = children
+                });
+
+                continue;
+            }
+
+            // A collection nested inside an element is left out on purpose: the detail pane
+            // shows one level of elements, and a sequence of sequences has no flat rendering.
+            if (resolved.Kind is RtiTypeKind.Array or RtiTypeKind.Sequence ||
+                MapKind(resolved.Kind) == PayloadValueKind.Unsupported)
+            {
+                continue;
+            }
+
+            nodes.Add(new ElementNode
+            {
+                Name = member.Key,
+                LeafKind = resolved.Kind,
+                EnumLabels = resolved.Kind == RtiTypeKind.Enumeration ? BuildEnumLabels(resolved) : null
+            });
+        }
+
+        return nodes.Count == 0 ? null : nodes.ToArray();
+    }
+
+    /// <summary>
+    /// Name/type pairs of a struct or union, or null for anything else. Struct and union
+    /// members are unrelated types in the RTI API, so they are reduced to a common shape here
+    /// rather than at every call site.
+    /// </summary>
+    private static List<KeyValuePair<string, DynamicType>> MembersOf(DynamicType type)
+    {
+        var members = new List<KeyValuePair<string, DynamicType>>();
+
+        switch (type)
+        {
+            case StructType structType:
+                foreach (var member in structType.Members)
+                {
+                    members.Add(new KeyValuePair<string, DynamicType>(member.Name, member.Type));
+                }
+
+                break;
+
+            case UnionType unionType:
+                foreach (var member in unionType.Members)
+                {
+                    members.Add(new KeyValuePair<string, DynamicType>(member.Name, member.Type));
+                }
+
+                break;
+
+            default:
+                return null;
+        }
+
+        return members;
+    }
+
+    private static IReadOnlyDictionary<long, string> BuildEnumLabels(DynamicType type)
+    {
+        if (type is not EnumType enumType)
+        {
+            return null;
+        }
+
+        var labels = new Dictionary<long, string>();
+        foreach (var member in enumType.Members)
+        {
+            labels[member.Ordinal] = member.Name;
+        }
+
+        return labels;
     }
 
     internal static PayloadValueKind MapKind(RtiTypeKind kind)
@@ -313,22 +465,6 @@ public static class RtiSchemaBuilder
 
             Fields.Add(field);
             return field;
-        }
-
-        private static IReadOnlyDictionary<long, string> BuildEnumLabels(DynamicType type)
-        {
-            if (type is not EnumType enumType)
-            {
-                return null;
-            }
-
-            var labels = new Dictionary<long, string>();
-            foreach (var member in enumType.Members)
-            {
-                labels[member.Ordinal] = member.Name;
-            }
-
-            return labels;
         }
 
         private static string DescribeType(DynamicType type)

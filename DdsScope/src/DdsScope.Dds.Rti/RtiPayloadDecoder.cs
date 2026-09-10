@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Globalization;
 using DdsScope.Core.Payload;
 using Rti.Types.Dynamic;
 using RtiTypeKind = Omg.Types.Dynamic.TypeKind;
@@ -254,30 +255,172 @@ internal sealed class RtiPayloadDecoder
 
         if (length > maxCollectionElements)
         {
-            builder.SetCollection(field, new CollectionValue(length, Array.Empty<object>(), true));
+            builder.SetCollection(field, LengthOnly(length, CollectionTruncation.ElementCap));
             return;
         }
 
         object[] items;
         try
         {
-            items = Materialize(data.GetAnyValue(node.Name), length);
+            // Which path to take is decided by the type plan, not by what GetAnyValue hands
+            // back: GetAnyValue only understands primitives, so on a sequence of structs it
+            // throws - or returns something that is not the elements at all.
+            items = node.ElementMembers != null
+                ? ReadAggregateElements(data, node, length)
+                : Materialize(data.GetAnyValue(node.Name), length);
         }
         catch (Exception)
         {
             // A collection we cannot read must not cost us the rest of the sample.
-            builder.SetCollection(field, new CollectionValue(length, Array.Empty<object>(), true));
+            builder.SetCollection(field, LengthOnly(length, CollectionTruncation.Unreadable));
             return;
         }
 
-        builder.SetCollection(field, new CollectionValue(length, items, items.Length < length));
+        builder.SetCollection(field, new CollectionValue(
+            length,
+            items,
+            items.Length >= length ? CollectionTruncation.None : CollectionTruncation.Unreadable));
+    }
+
+    private static CollectionValue LengthOnly(int length, CollectionTruncation reason) =>
+        new(length, Array.Empty<object>(), reason);
+
+    /// <summary>
+    /// Reads a collection whose elements are structs or unions.
+    ///
+    /// RTI exposes such a collection as a DynamicData whose members are its elements, numbered
+    /// from 1, so each element is loaned in turn and walked with the element plan. That is one
+    /// loan per element, which is why this runs only after the count has been checked against
+    /// the cap.
+    /// </summary>
+    private object[] ReadAggregateElements(DynamicData data, ReadNode node, int length)
+    {
+        var take = Math.Min(length, maxCollectionElements);
+        var items = new object[take];
+        var members = new List<CollectionMember>();
+
+        using var loaned = data.LoanValue(node.Name);
+        var collection = loaned.Data;
+
+        for (var i = 0; i < take; i++)
+        {
+            members.Clear();
+
+            using (var element = collection.LoanValueByIndex((uint)(i + 1)))
+            {
+                ReadElementMembers(element.Data, node.ElementMembers, members, null);
+            }
+
+            items[i] = new CollectionElement(members.ToArray());
+        }
+
+        return items;
+    }
+
+    private static void ReadElementMembers(
+        DynamicData data,
+        ElementNode[] plan,
+        List<CollectionMember> into,
+        string prefix)
+    {
+        for (var i = 0; i < plan.Length; i++)
+        {
+            var member = plan[i];
+            var path = prefix == null ? member.Name : prefix + "." + member.Name;
+
+            if (member.IsAggregate)
+            {
+                using var loaned = data.LoanValue(member.Name);
+                ReadElementMembers(loaned.Data, member.Children, into, path);
+                continue;
+            }
+
+            into.Add(new CollectionMember(path, ReadElementLeaf(data, member)));
+        }
+    }
+
+    /// <summary>
+    /// Reads one leaf of an element. Values are boxed here, unlike the flat-slot path for
+    /// top-level fields: an element has no slot of its own, and there are few of them.
+    /// </summary>
+    private static object ReadElementLeaf(DynamicData data, ElementNode member)
+    {
+        switch (member.LeafKind)
+        {
+            case RtiTypeKind.Boolean:
+                return data.GetValue<bool>(member.Name);
+
+            case RtiTypeKind.Int16:
+                return data.GetValue<short>(member.Name);
+
+            case RtiTypeKind.Int32:
+                return data.GetValue<int>(member.Name);
+
+            case RtiTypeKind.Int64:
+                return data.GetValue<long>(member.Name);
+
+            case RtiTypeKind.Uint8:
+                return data.GetValue<byte>(member.Name);
+
+            case RtiTypeKind.Uint16:
+                return data.GetValue<ushort>(member.Name);
+
+            case RtiTypeKind.UInt32:
+                return data.GetValue<uint>(member.Name);
+
+            case RtiTypeKind.UInt64:
+                return data.GetValue<ulong>(member.Name);
+
+            case RtiTypeKind.Float32:
+                return data.GetValue<float>(member.Name);
+
+            case RtiTypeKind.Float64:
+                return data.GetValue<double>(member.Name);
+
+            case RtiTypeKind.Char8:
+            case RtiTypeKind.Char16:
+                return data.GetValue<char>(member.Name);
+
+            case RtiTypeKind.String:
+            case RtiTypeKind.WideString:
+                return data.GetValue<string>(member.Name);
+
+            case RtiTypeKind.Enumeration:
+            {
+                // Resolved here rather than at display time, matching PayloadSnapshot.FormatValue:
+                // an element carries no schema of its own for the view to consult.
+                var raw = data.GetValue<int>(member.Name);
+                return member.EnumLabels != null && member.EnumLabels.TryGetValue(raw, out var label)
+                    ? label + " (" + raw.ToString(CultureInfo.InvariantCulture) + ")"
+                    : raw;
+            }
+
+            // Int8 and Octet are not switch labels because the 7.3.0 baseline does not define
+            // them, the same reason ReadLeaf compares them by value.
+            default:
+                if (member.LeafKind == RtiKindCompat.Int8)
+                {
+                    return data.GetValue<sbyte>(member.Name);
+                }
+
+                return member.LeafKind == RtiKindCompat.Octet
+                    ? data.GetValue<byte>(member.Name)
+                    : data.GetAnyValue(member.Name);
+        }
     }
 
     private object[] Materialize(object raw, int length)
     {
-        if (raw is not IEnumerable enumerable || raw is string)
+        if (raw is string text)
         {
-            return raw == null ? Array.Empty<object>() : new[] { raw };
+            return new object[] { text };
+        }
+
+        if (raw is not IEnumerable enumerable)
+        {
+            // Not a shape we can enumerate. Recording the length alone is honest; presenting
+            // the whole collection as its single element is not.
+            return Array.Empty<object>();
         }
 
         var take = Math.Min(length, maxCollectionElements);

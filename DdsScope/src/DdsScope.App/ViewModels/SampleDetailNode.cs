@@ -147,19 +147,55 @@ public sealed class SampleDetailNode : ObservableObject
 
         for (var i = 0; i < collection.Items.Count; i++)
         {
-            yield return new SampleDetailNode("[" + i.ToString(CultureInfo.InvariantCulture) + "]")
+            var name = "[" + i.ToString(CultureInfo.InvariantCulture) + "]";
+            var item = collection.Items[i];
+
+            // A struct element earns a subtree: a SourceId reads as {SystemId=1, HostId=2} and
+            // opens into one node per member.
+            if (item is CollectionElement element)
             {
-                Value = Convert.ToString(collection.Items[i], CultureInfo.InvariantCulture)
+                var node = new SampleDetailNode(name) { Value = element.ToString() };
+                foreach (var member in element.Members)
+                {
+                    node.Children.Add(new SampleDetailNode(member.Name)
+                    {
+                        Value = Convert.ToString(member.Value, CultureInfo.InvariantCulture)
+                    });
+                }
+
+                yield return node;
+                continue;
+            }
+
+            yield return new SampleDetailNode(name)
+            {
+                Value = Convert.ToString(item, CultureInfo.InvariantCulture)
             };
         }
 
         if (collection.Truncated)
         {
-            yield return new SampleDetailNode("...")
-            {
-                Value = $"{collection.Length} elements on the wire; only the first {collection.Items.Count} were captured"
-            };
+            yield return new SampleDetailNode("...") { Value = DescribeTruncation(collection) };
         }
+    }
+
+    /// <summary>
+    /// Says why the elements are missing. Being over the capture cap and being undecodable
+    /// leave the same gap but mean opposite things, and only the first is about size.
+    /// </summary>
+    private static string DescribeTruncation(CollectionValue collection)
+    {
+        var length = collection.Length.ToString(CultureInfo.InvariantCulture);
+
+        if (collection.Truncation == CollectionTruncation.Unreadable)
+        {
+            return collection.Items.Count == 0
+                ? $"{length} elements on the wire; this element type could not be decoded"
+                : $"{length} elements on the wire; the rest could not be decoded";
+        }
+
+        return $"{length} elements on the wire; only the first " +
+               collection.Items.Count.ToString(CultureInfo.InvariantCulture) + " were captured";
     }
 
     /// <summary>Creates the struct nodes a dotted path implies, reusing ones already made.</summary>

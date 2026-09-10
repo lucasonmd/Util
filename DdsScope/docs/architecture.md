@@ -110,6 +110,15 @@ Decoding walks a precomputed plan (`ReadNode` tree) rather than re-interpreting 
 `MaxCollectionElements` (default 64). That is what stops a `sequence<octet, 3000000>` from
 being materialised on the receive thread.
 
+Collections of primitives are copied as a block through `GetAnyValue`, but a collection of
+structs — a `sequence<SourceId>` — cannot be: `GetAnyValue` understands primitives only. Those
+are read element by element instead, each loaned from the collection and walked with an
+`ElementNode` plan built once with the schema, into a `CollectionElement` per element. Which of
+the two paths applies is decided by the element type in the plan, never by what `GetAnyValue`
+returns. When neither path can read the elements, `CollectionValue.Truncation` records
+`Unreadable` rather than `ElementCap`, so the detail pane does not report an undecodable type as
+one that outgrew the cap.
+
 Strings that would be expensive and are rarely read — the instance key, the payload summary —
 are computed lazily by `CaptureRecord`, when a grid cell or CSV row actually asks.
 
