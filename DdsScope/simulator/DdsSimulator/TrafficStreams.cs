@@ -1,3 +1,4 @@
+﻿using System.Globalization;
 using Rti.Dds.Core.Policy;
 using Rti.Dds.Domain;
 using Rti.Dds.Publication;
@@ -65,6 +66,61 @@ public static class TrafficStreams
             CreateSourceList(participant, publisher, factory),
             CreateWideSensor(participant, publisher, factory)
         };
+    }
+
+    /// <summary>
+    /// Builds a large, uniform population for exercising discovery at scale: one type and one
+    /// topic per index, each carrying <paramref name="writersPerTopic"/> writers.
+    ///
+    /// Distinct types rather than one type reused across every topic, because the cost being
+    /// measured is on the viewer's side: it builds a schema per type and a reader per topic,
+    /// and sharing a type would collapse both into a single cache hit. The shape is kept
+    /// small - the point is the number of endpoints discovery has to carry, not payload size.
+    /// </summary>
+    public static List<TrafficStream> CreateStress(
+        DomainParticipant participant,
+        int topicCount,
+        int writersPerTopic)
+    {
+        var publisher = participant.CreatePublisher();
+        var factory = DynamicTypeFactory.Instance;
+        var streams = new List<TrafficStream>(topicCount * writersPerTopic);
+
+        for (var t = 0; t < topicCount; t++)
+        {
+            var name = "C_Stress_" + t.ToString("D3", CultureInfo.InvariantCulture);
+
+            var type = factory.BuildStruct()
+                .WithName(name)
+                .AddMember(new StructMember("SourceID", factory.GetPrimitiveType<int>(), isKey: true))
+                .AddMember(new StructMember("Counter", factory.GetPrimitiveType<int>()))
+                .AddMember(new StructMember("Value", factory.GetPrimitiveType<double>()))
+                .AddMember(new StructMember("Label", factory.CreateArray(factory.GetPrimitiveType<char>(), LabelWidth)))
+                .Create();
+
+            var topic = participant.CreateTopic(name, type);
+
+            for (var w = 0; w < writersPerTopic; w++)
+            {
+                var writer = publisher.CreateDataWriter(topic);
+                var counter = 0;
+                var index = w;
+
+                streams.Add(new TrafficStream(name, writer, sample =>
+                {
+                    counter++;
+
+                    // Keyed by writer index, so every writer owns its own instance and the
+                    // viewer sees as many instances as there are endpoints.
+                    sample.SetValue("SourceID", index);
+                    sample.SetValue("Counter", counter);
+                    sample.SetValue("Value", counter % 1000 / 10.0);
+                    SetLabel(sample, "w" + index);
+                }));
+            }
+        }
+
+        return streams;
     }
 
     private static TrafficStream CreateMount(DomainParticipant participant, Publisher publisher, DynamicTypeFactory factory)
@@ -220,7 +276,7 @@ public static class TrafficStreams
             for (uint i = 1; i <= SourceCount; i++)
             {
                 // Writing element i is what grows the sequence to length i.
-                using var element = sources.Data.LoanValueByIndex(i);
+                using var element = sources.Data.LoanValue((int)i);
                 element.Data.SetValue("SystemID", (int)i);
                 element.Data.SetValue("NodeID", counter + (int)i);
             }

@@ -398,7 +398,7 @@ internal sealed class RtiPayloadDecoder
         {
             members.Clear();
 
-            using (var element = collection.LoanValueByIndex((uint)(i + 1)))
+            using (var element = collection.LoanValue(i + 1))
             {
                 ReadElementMembers(element.Data, node.ElementMembers, members, null);
             }

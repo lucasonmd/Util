@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -53,15 +53,34 @@ public partial class MainWindow : Window
     /// so the newest samples pile up above the viewport and the user drifts away from the
     /// live tail without having scrolled. Any deliberate scroll, click or key turns live
     /// follow off first, so this never fights the user.
+    ///
+    /// The focused row is what actually decides where the grid looks: rows are inserted above
+    /// it, so its handle grows by the size of every batch and the grid scrolls down to keep it
+    /// visible. Pointing the focus at the newest row makes that behaviour agree with live
+    /// follow instead of fighting it.
+    ///
+    /// It has to happen here, synchronously, and not on a deferred dispatcher callback. The
+    /// deferred version corrected the viewport after the grid had already laid out and drawn
+    /// the drifted position, so every batch put one frame of "scrolled down" on screen before
+    /// snapping back - which is exactly what reads as the rows twitching up and down.
     /// </summary>
     private void ScrollCaptureToTop()
     {
-        if (!viewModel.LiveFollow || CaptureView.TopRowIndex == 0)
+        if (!viewModel.LiveFollow)
         {
             return;
         }
 
-        CaptureView.TopRowIndex = 0;
+        if (CaptureView.FocusedRowHandle != 0)
+        {
+            CaptureView.FocusedRowHandle = 0;
+        }
+
+        if (CaptureView.TopRowIndex != 0)
+        {
+            CaptureView.TopRowIndex = 0;
+        }
+
     }
 
     private void OnGridKeyDown(object sender, KeyEventArgs e)

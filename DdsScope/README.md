@@ -62,6 +62,13 @@ per payload field.
 The final display condition is `selection AND display filter AND quick search`. None of them
 affect what is captured — everything the tool receives is stored regardless.
 
+**The box above the tree narrows the tree itself**, by topic name, type name, writer or
+participant; a topic is kept when it matches or when any of its writers does, and it then
+shows all of its writers. It is the one search that changes nothing but what you can see in
+that panel — not the selection, not the grid, not what is captured — and the `12 / 100` beside
+it says how much of the domain is currently hidden. On a domain with a couple of hundred
+topics it is the difference between scrolling and typing.
+
 ### Display filter
 
 ```
@@ -177,9 +184,28 @@ The mixed reliability is deliberate: it exercises the viewer's per-topic reader 
 | Option | Meaning |
 | --- | --- |
 | `--domain N` | domain id (default 0) |
-| `--rate N` | samples per second per topic (default 200) |
+| `--rate N` | samples per second per writer (default 200) |
 | `--seconds N` | stop after N seconds (default: run until Ctrl+C) |
 | `--no-typecode` | publish without advertising the type, to exercise the viewer's `Type unavailable` path |
+| `--stress` | replace the five topics with a large uniform population, for discovery at scale |
+| `--topics N` | topics in stress mode (default 200) |
+| `--writers-per-topic N` | writers on each stress topic (default 5) |
+
+Stress mode gives every topic its own type, so the viewer really does build one schema and one
+reader per topic instead of hitting a cache:
+
+```
+simulator\DdsSimulator\bin\Debug\net8.0\DdsSimulator.exe --domain 0 --stress --rate 2
+```
+
+200 topics x 5 writers = 1,000 writers. Measured on the prototype machine, connecting to that
+costs nothing visible: the tree fills to 200 topics and 1,000 writers with the UI message
+round-trip staying at a 1.1 ms median (p99 28 ms), and the heaviest interaction afterwards -
+`All topics`, which re-projects the whole store - hitches once for about 120 ms at 150k stored
+samples. What does show up is `DDS Lost`: the simulator's writers keep the default
+`KEEP_LAST` depth of 1, so at this rate a sample can be overwritten before the reader takes
+it. That is the publisher's history depth, not viewer loss - `Queue Drop` and `Evicted` stay
+at 0.
 
 Then start the viewer on the same domain:
 

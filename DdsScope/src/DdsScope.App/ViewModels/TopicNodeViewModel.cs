@@ -61,6 +61,46 @@ public sealed class TopicNodeViewModel : ObservableObject
 
     public string WriterId => Writer?.Id;
 
+    /// <summary>
+    /// True when <paramref name="term"/> appears in either line the tree shows for this node,
+    /// which is topic name plus type for a topic and writer name plus participant for a
+    /// writer. Matching what is on screen rather than a separate set of fields is what makes
+    /// the box predictable: whatever the user can read, they can search for.
+    /// </summary>
+    public bool MatchesSearch(string term) =>
+        (Caption != null && Caption.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+        (Detail != null && Detail.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Takes on a freshly discovered description of the same topic.
+    ///
+    /// A rediscovered topic arrives as a new <see cref="DdsTopicInfo"/>: within one connection
+    /// the adapter mutates the instance the node already holds, but a reconnect builds a new
+    /// one. Refreshing from the instance held would keep the previous connection's type state,
+    /// so a publisher that had stopped propagating its type still read as available while
+    /// nothing decoded.
+    /// </summary>
+    public void AdoptTopic(DdsTopicInfo topic)
+    {
+        if (topic != null)
+        {
+            Topic = topic;
+        }
+
+        RefreshFromTopic();
+    }
+
+    /// <summary>Takes on a freshly discovered description of the same writer.</summary>
+    public void AdoptWriter(DdsWriterInfo writer)
+    {
+        if (writer != null)
+        {
+            Writer = writer;
+        }
+
+        RefreshFromWriter();
+    }
+
     public void RefreshFromTopic()
     {
         if (Topic == null)

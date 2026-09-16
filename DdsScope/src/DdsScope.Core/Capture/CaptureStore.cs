@@ -187,6 +187,9 @@ public sealed class CaptureStore
             lastChunkCount = 0;
             estimatedBytes = 0;
             count = 0;
+
+            // The eviction total counts records dropped from what is being discarded here.
+            evictedCount = 0;
         }
     }
 }

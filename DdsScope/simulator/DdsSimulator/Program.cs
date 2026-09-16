@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Rti.Dds.Domain;
 
 namespace DdsSimulator;
@@ -8,6 +8,7 @@ namespace DdsSimulator;
 /// DynamicData when the target system is not available.
 ///
 /// Usage: DdsSimulator [--domain N] [--rate N] [--seconds N] [--no-typecode]
+///                     [--stress] [--topics N] [--writers-per-topic N]
 /// </summary>
 internal static class Program
 {
@@ -17,8 +18,11 @@ internal static class Program
         var ratePerTopic = ArgInt(args, "--rate", 200);
         var seconds = ArgInt(args, "--seconds", 0);
         var noTypeCode = args.Contains("--no-typecode", StringComparer.OrdinalIgnoreCase);
+        var stress = args.Contains("--stress", StringComparer.OrdinalIgnoreCase);
+        var topicCount = ArgInt(args, "--topics", 200);
+        var writersPerTopic = ArgInt(args, "--writers-per-topic", 5);
 
-        Console.WriteLine($"DdsSimulator: domain {domainId}, {ratePerTopic} samples/s per topic.");
+        Console.WriteLine($"DdsSimulator: domain {domainId}, {ratePerTopic} samples/s per writer.");
 
         // --no-typecode emulates a publisher that does not advertise its type, so the
         // viewer's "Type unavailable" path can be exercised.
@@ -29,8 +33,23 @@ internal static class Program
                 domainId,
                 TrafficStreams.ParticipantQosWithTypePropagation());
 
-        var streams = TrafficStreams.CreateAll(participant);
-        Console.WriteLine("Topics: " + string.Join(", ", streams.Select(s => s.TopicName)));
+        var creating = Stopwatch.StartNew();
+        var streams = stress
+            ? TrafficStreams.CreateStress(participant, topicCount, writersPerTopic)
+            : TrafficStreams.CreateAll(participant);
+        creating.Stop();
+
+        if (stress)
+        {
+            Console.WriteLine(
+                $"stress: {topicCount:N0} topics x {writersPerTopic:N0} writers = " +
+                $"{streams.Count:N0} writers, built in {creating.Elapsed.TotalSeconds:N1}s.");
+        }
+        else
+        {
+            Console.WriteLine("Topics: " + string.Join(", ", streams.Select(s => s.TopicName)));
+        }
+
         Console.WriteLine("Publishing. Press Ctrl+C to stop.");
 
         var stop = false;
