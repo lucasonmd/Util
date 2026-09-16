@@ -15,6 +15,7 @@ public partial class MainWindow : Window
 
     private readonly MainViewModel viewModel = new();
     private PayloadSchema currentSchema;
+    private FilterHelpWindow filterHelp;
 
     public MainWindow()
     {
@@ -194,6 +195,31 @@ public partial class MainWindow : Window
         };
 
         return dialog.ShowDialog(this) == true ? dialog.FileName : null;
+    }
+
+    /// <summary>
+    /// Opens the filter cheat sheet, or brings the open one forward.
+    ///
+    /// One instance at a time, owned by this window so it never outlives the app or gets lost
+    /// behind it. Clicking "?" again with the sheet already open reads as "show it to me", not
+    /// "open a second copy".
+    /// </summary>
+    private void OnFilterHelpClick(object sender, RoutedEventArgs e)
+    {
+        if (filterHelp == null)
+        {
+            filterHelp = new FilterHelpWindow { Owner = this };
+            filterHelp.Closed += (_, _) => filterHelp = null;
+            filterHelp.Show();
+            return;
+        }
+
+        if (filterHelp.WindowState == WindowState.Minimized)
+        {
+            filterHelp.WindowState = WindowState.Normal;
+        }
+
+        filterHelp.Activate();
     }
 
     private void OnFilterEqualsClick(object sender, RoutedEventArgs e) => AppendFilterFromSelection("==");

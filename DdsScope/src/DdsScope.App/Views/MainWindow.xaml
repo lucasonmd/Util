@@ -59,7 +59,16 @@
                     <TextBox Text="{Binding DisplayFilterText, UpdateSourceTrigger=PropertyChanged, Delay=300}"
                              Width="520" VerticalContentAlignment="Center" FontFamily="Consolas"
                              ToolTip="e.g. topic == &quot;C_Rotational_Mount&quot; &amp;&amp; data.SourceID == 3 &amp;&amp; data.Info >= 10" />
-                    <Button Content="x" Command="{Binding ClearFilterCommand}" Width="24" Margin="2,0,0,0" />
+                    <Button Content="Clear" Command="{Binding ClearFilterCommand}" Width="52" Margin="2,0,0,0"
+                            ToolTip="Empties the filter box. The capture is not touched." />
+                    <!--
+                        Padding rather than a fixed Width, as "All topics" below already does. A
+                        narrow fixed width does not shrink the content, it clips it: at Width="24"
+                        the button's own padding leaves nothing to draw in and a one-character
+                        caption disappears entirely, which is what the old "x" buttons did.
+                    -->
+                    <Button Content="?" Click="OnFilterHelpClick" Padding="8,1" Margin="2,0,0,0"
+                            ToolTip="Fields, operators and examples for the display filter." />
 
                     <TextBlock Text="{Binding FilterError}" Foreground="#C0392B" VerticalAlignment="Center" Margin="10,0,0,0">
                         <TextBlock.Style>
@@ -125,8 +134,8 @@
                         </DockPanel>
 
                         <DockPanel Margin="0,6,0,0">
-                            <Button DockPanel.Dock="Right" Content="x" Command="{Binding ClearTopicSearchCommand}"
-                                    Width="22" Margin="4,0,0,0" ToolTip="Shows every topic again." />
+                            <Button DockPanel.Dock="Right" Content="Clear" Command="{Binding ClearTopicSearchCommand}"
+                                    Padding="6,1" Margin="4,0,0,0" ToolTip="Shows every topic again." />
                             <TextBlock DockPanel.Dock="Right" Text="{Binding TopicSearchSummary}" Foreground="#999999"
                                        VerticalAlignment="Center" Margin="6,0,0,0" />
                             <TextBox Text="{Binding TopicSearchText, UpdateSourceTrigger=PropertyChanged, Delay=200}"

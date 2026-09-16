@@ -29,6 +29,52 @@ src\DdsScope.App\bin\Debug\net8.0-windows\DdsScope.exe --domain 0 --connect
 
 ---
 
+## Deploying it
+
+```
+dotnet publish src/DdsScope.App/DdsScope.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:SatelliteResourceLanguages=en -p:DebugType=none -o out/single
+```
+
+(One line on purpose: `^` continuations work in `cmd` but break in PowerShell.)
+
+That produces **one 240 MB `DdsScope.exe`** with the .NET runtime, WPF, DevExpress and the
+Connext binding inside it. The target machine needs neither the .NET 8 Desktop Runtime nor a
+Connext installation.
+
+What it does still need is a license, because `rti_license.dat` is not part of the executable.
+Copy it next to the exe — Connext looks in the working directory — or point `RTI_LICENSE_FILE`
+or `NDDSHOME` at one. Without it the app starts and the window opens, but connecting fails with
+`[RTI LICENSE ERROR] | RTI Connext No source for License information`. **So the unit of
+deployment is two files: `DdsScope.exe` and `rti_license.dat`.**
+
+`IncludeNativeLibrariesForSelfExtract` is not optional. Managed assemblies are loaded straight
+out of the bundle without ever existing as files, but `LoadLibrary` needs a real path, so
+`nddsc.dll`, `nddscore.dll` and the VC runtime are unpacked on first run into
+`%TEMP%\.net\DdsScope\<hash of the exe>\`. The hash means a rebuilt exe extracts fresh rather
+than picking up the previous build's natives.
+
+**Compression is deliberately off.** `-p:EnableCompressionInSingleFile=true` takes the file from
+240 MB to 99 MB, and on the prototype machine it costs, measured over three runs each:
+
+| | file | startup | private | working set |
+| --- | --- | --- | --- | --- |
+| uncompressed | 240 MB | ~1,800 ms | 139 MB | 243 MB |
+| compressed | 99 MB | ~2,160 ms | 216 MB | 404 MB |
+
+Throughput is identical — the same JIT-compiled code either way — but a compressed bundle
+cannot be memory-mapped. Every assembly has to be inflated into private memory and none of it
+can be paged back out, which is the ~165 MB. On a tool whose job is holding captured samples in
+a memory budget the user sets, spending disk to keep that budget is the better trade.
+
+Trimming is not used and should not be: DevExpress and the DynamicData decoder both resolve
+types by reflection, so a trimmed build breaks at runtime rather than at build time.
+
+One caveat for anything leaving this machine — the build prints
+`DX1000: For evaluation purposes only. Redistribution prohibited.` DevExpress needs a real
+license before the exe is handed to anyone.
+
+---
+
 ## Layout
 
 | Project | Contents | May reference |
@@ -90,6 +136,10 @@ one topic's filter cannot break the all-topics view.
 
 An invalid filter is reported next to the box and the previous good filter stays in effect —
 capture is never interrupted by a half-typed expression.
+
+The **`?`** beside the filter box opens this same reference — fields, operators, values and
+examples — in a window that stays open while you type, so the syntax is available without
+leaving the app.
 
 Right-clicking a value in the **Sample Detail** tree offers `Filter == this value` /
 `Filter != this value`, which are ANDed onto the existing expression.
