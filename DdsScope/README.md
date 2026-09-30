@@ -187,15 +187,16 @@ ever asked to resend history because a debug tool joined.
 **Windows Firewall.** DDS discovery needs inbound UDP. The first run raises the usual prompt;
 until it is allowed, the tool joins the domain but discovers nothing.
 
-**Hard-killing DDS processes can poison the host** on Windows. After repeatedly force-killing
-participants, .NET Connext processes on this machine stopped discovering each other on *any*
-domain — including a twenty-line probe with default QoS and no DdsScope code in it — while
-RTI's own C++ `rtiddsspy` on the same domain still saw everything. Publishing kept working;
-only reception broke. Changing domain, discovery peers (unicast, multicast, shared memory) and
-QoS made no difference, and the firewall allowed UDP inbound for every binary involved.
+**Topics already on the network not showing on connect** was a DdsScope bug, not host state.
+A participant that is enabled at creation starts discovery immediately, and the announcements
+of writers that already exist arrive before the publication built-in reader has been looked
+up; those samples are lost, so only writers started *after* connecting appeared. A plain
+.NET probe written the same way fails the same way, which is why this was long mistaken for a
+"poisoned" machine.
+`RtiDdsConnection` now creates the participant disabled, looks the reader up, then enables it.
+Any other tool built on the .NET API must do the same.
 
-If discovery goes quiet across the board, reboot. To confirm the machine rather than the tool,
-run RTI's own spy against the same publisher:
+If discovery still goes quiet across the board, run RTI's own spy against the same publisher:
 
 ```
 rtiddsspy -domainId <id>
@@ -236,6 +237,7 @@ The mixed reliability is deliberate: it exercises the viewer's per-topic reader 
 | `--domain N` | domain id (default 0) |
 | `--rate N` | samples per second per writer (default 200) |
 | `--seconds N` | stop after N seconds (default: run until Ctrl+C) |
+| `--publish-seconds N` | write for N seconds, then stop writing but keep the writers alive - for checking that a viewer started later still discovers every topic |
 | `--no-typecode` | publish without advertising the type, to exercise the viewer's `Type unavailable` path |
 | `--stress` | replace the five topics with a large uniform population, for discovery at scale |
 | `--topics N` | topics in stress mode (default 200) |

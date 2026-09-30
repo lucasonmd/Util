@@ -110,12 +110,14 @@ public sealed class RtiDdsConnection : IDdsConnection
         var participantQos = DomainParticipantFactory.Instance.DefaultParticipantQos
             .WithResourceLimits(limits => limits.TypeCodeMaxSerializedLength = TypeCodeMaxSerializedLength);
 
-        participant = DomainParticipantFactory.Instance.CreateParticipant(DomainId, participantQos);
-
-        // A wildcard partition makes the tool see writers in any partition, which is the
-        // point of a debug viewer. It costs nothing on the publisher side.
-        subscriber = participant.CreateSubscriber(
-            participant.DefaultSubscriberQos.WithPartition(new Partition(new[] { "*" })));
+        // The participant MUST be created disabled and enabled only after the publication
+        // built-in reader has been looked up. An enabled participant starts discovery at once,
+        // and against writers that already exist the announcements arrive within milliseconds -
+        // before the lookup - and are lost: the viewer then shows none of the topics already on
+        // the network, while anything started later appears normally. Measured on the
+        // simulator: enabled at creation found the pre-existing writers in 2 of 12 runs,
+        // created disabled in 12 of 12.
+        participant = CreateDisabledParticipant(participantQos);
 
         publicationReader = participant.BuiltinSubscriber
             .LookupDataReader<PublicationBuiltinTopicData>(Subscriber.PublicationBuiltinTopicName);
@@ -124,6 +126,13 @@ public sealed class RtiDdsConnection : IDdsConnection
         {
             throw new InvalidOperationException("The publication built-in reader is not available.");
         }
+
+        participant.Enable();
+
+        // A wildcard partition makes the tool see writers in any partition, which is the
+        // point of a debug viewer. It costs nothing on the publisher side.
+        subscriber = participant.CreateSubscriber(
+            participant.DefaultSubscriberQos.WithPartition(new Partition(new[] { "*" })));
 
         receiveWakeup = new GuardCondition();
         receiveWaitSet = new WaitSet();
@@ -143,6 +152,31 @@ public sealed class RtiDdsConnection : IDdsConnection
             IsBackground = true
         };
         discoveryThread.Start();
+    }
+
+    private static readonly object FactoryQosLock = new();
+
+    /// <summary>
+    /// Creates a participant that does not start discovery until <c>Enable()</c> is called.
+    /// Connext only offers this through the factory-wide entity factory policy, so it is
+    /// switched for the one call and restored, under a lock against concurrent connects.
+    /// </summary>
+    private DomainParticipant CreateDisabledParticipant(DomainParticipantQos participantQos)
+    {
+        var factory = DomainParticipantFactory.Instance;
+        lock (FactoryQosLock)
+        {
+            var previous = factory.Qos;
+            factory.Qos = previous.WithEntityFactory(EntityFactory.ManuallyEnable);
+            try
+            {
+                return factory.CreateParticipant(DomainId, participantQos);
+            }
+            finally
+            {
+                factory.Qos = previous;
+            }
+        }
     }
 
     // ---------------------------------------------------------------- discovery

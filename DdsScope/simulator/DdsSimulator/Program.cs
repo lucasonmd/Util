@@ -7,7 +7,7 @@ namespace DdsSimulator;
 /// Stand-alone DDS publisher used to exercise DdsScope against real discovery and real
 /// DynamicData when the target system is not available.
 ///
-/// Usage: DdsSimulator [--domain N] [--rate N] [--seconds N] [--no-typecode]
+/// Usage: DdsSimulator [--domain N] [--rate N] [--seconds N] [--publish-seconds N] [--no-typecode]
 ///                     [--stress] [--topics N] [--writers-per-topic N]
 /// </summary>
 internal static class Program
@@ -17,6 +17,7 @@ internal static class Program
         var domainId = ArgInt(args, "--domain", 0);
         var ratePerTopic = ArgInt(args, "--rate", 200);
         var seconds = ArgInt(args, "--seconds", 0);
+        var publishSeconds = ArgInt(args, "--publish-seconds", 0);
         var noTypeCode = args.Contains("--no-typecode", StringComparer.OrdinalIgnoreCase);
         var stress = args.Contains("--stress", StringComparer.OrdinalIgnoreCase);
         var topicCount = ArgInt(args, "--topics", 200);
@@ -63,9 +64,31 @@ internal static class Program
         var started = Stopwatch.StartNew();
         var published = 0L;
         var lastReport = TimeSpan.Zero;
+        var idle = false;
 
         while (!stop)
         {
+            if (seconds > 0 && started.Elapsed.TotalSeconds >= seconds)
+            {
+                break;
+            }
+
+            // --publish-seconds: stop writing but keep every writer alive, so a viewer
+            // started afterwards must find all topics through discovery alone.
+            if (publishSeconds > 0 && started.Elapsed.TotalSeconds >= publishSeconds)
+            {
+                if (!idle)
+                {
+                    idle = true;
+                    Console.WriteLine(
+                        $"Stopped writing after {published:N0} samples; writers stay alive for discovery. " +
+                        "Press Ctrl+C to exit.");
+                }
+
+                Thread.Sleep(200);
+                continue;
+            }
+
             foreach (var stream in streams)
             {
                 stream.WriteNext();
@@ -76,11 +99,6 @@ internal static class Program
             {
                 lastReport = started.Elapsed;
                 Console.WriteLine($"  {published:N0} samples in {started.Elapsed.TotalSeconds:N0}s");
-            }
-
-            if (seconds > 0 && started.Elapsed.TotalSeconds >= seconds)
-            {
-                break;
             }
 
             Thread.Sleep(interval);

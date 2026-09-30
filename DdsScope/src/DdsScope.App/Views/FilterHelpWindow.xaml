@@ -43,11 +43,6 @@
 
     <DockPanel>
 
-        <Border DockPanel.Dock="Bottom" Background="#F5F5F5" BorderBrush="#DDDDDD"
-                BorderThickness="0,1,0,0" Padding="8,6">
-            <Button Content="Close" IsCancel="True" Width="80" HorizontalAlignment="Right" />
-        </Border>
-
         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,10,14,14">
             <StackPanel>
 
