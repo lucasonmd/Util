@@ -181,8 +181,17 @@ DdsScope sets the same policy on its own participant so it can store what it rec
 **Reader QoS is derived from the writers found.** A single fixed QoS cannot match everything:
 a RELIABLE reader is incompatible with a BEST_EFFORT writer, and OWNERSHIP must match exactly.
 DdsScope therefore picks the reader QoS per topic from what discovery reports and rebuilds the
-reader when a new writer changes the answer. Readers are always VOLATILE, so no publisher is
-ever asked to resend history because a debug tool joined.
+reader when a new writer changes the answer.
+
+Durability is derived the same way. Where every writer of a topic is TRANSIENT_LOCAL (or
+stronger) and the reader is RELIABLE, the reader asks for TRANSIENT_LOCAL, so connecting - or
+reconnecting - after the data was published still delivers what the writers kept. That is what
+makes a topic written once at start-up show its samples instead of sitting empty. One VOLATILE
+writer on the topic makes the reader VOLATILE, because a reader asking for more than a writer
+offers does not match it at all. Against VOLATILE writers nothing can be recovered by any
+subscriber: samples written before the reader matched - including the first few after a new
+writer appears, while discovery is still creating the reader - are not kept anywhere. And a
+reconnect without `Clear` captures the redelivered history a second time.
 
 **Windows Firewall.** DDS discovery needs inbound UDP. The first run raises the usual prompt;
 until it is allowed, the tool joins the domain but discovers nothing.
@@ -220,15 +229,16 @@ simulator\DdsSimulatorin\Debug
 et8.0\DdsSimulator.exe --domain 0 --rate 200
 ```
 
-It publishes five topics that resemble the target traffic:
+It publishes six topics that resemble the target traffic:
 
 | Topic | Shape | Reliability |
 | --- | --- | --- |
 | `C_Rotational_Mount` | keyed struct, ints, doubles, an enum | RELIABLE |
 | `C_Platform_State` | keyed struct, string, nested `Position` struct | BEST_EFFORT |
-| `C_Track_Report` | keyed struct, `sequence<long, 16>` | RELIABLE |
+| `C_Track_Report` | keyed struct, `sequence<long, 16>`; writes 10 samples at start-up, then stays silent with its writer alive | RELIABLE, TRANSIENT_LOCAL |
 | `C_Source_List` | keyed struct, `char[8]`, `sequence<SourceId, 8>` (struct elements) | RELIABLE |
 | `C_Sensor_Wide` | 27 members over every primitive, an enum, a nested struct, a sequence | RELIABLE |
+| `C_Derived_Track` | inherits `TrackBase : MessageHeader` (key in the base), nested and sequence elements of a derived struct | RELIABLE |
 
 The mixed reliability is deliberate: it exercises the viewer's per-topic reader QoS derivation.
 
@@ -239,7 +249,7 @@ The mixed reliability is deliberate: it exercises the viewer's per-topic reader 
 | `--seconds N` | stop after N seconds (default: run until Ctrl+C) |
 | `--publish-seconds N` | write for N seconds, then stop writing but keep the writers alive - for checking that a viewer started later still discovers every topic |
 | `--no-typecode` | publish without advertising the type, to exercise the viewer's `Type unavailable` path |
-| `--stress` | replace the five topics with a large uniform population, for discovery at scale |
+| `--stress` | replace the six topics with a large uniform population, for discovery at scale |
 | `--topics N` | topics in stress mode (default 200) |
 | `--writers-per-topic N` | writers on each stress topic (default 5) |
 

@@ -405,6 +405,14 @@ public sealed class RtiDdsConnection : IDdsConnection
             ? OwnershipKind.Shared
             : OwnershipKind.Exclusive;
 
+        // TRANSIENT_LOCAL only when every writer offers it and the reader is reliable. A reader
+        // asking for more durability than a writer offers does not match that writer at all,
+        // so one VOLATILE writer on the topic means VOLATILE; and history is only redelivered
+        // over a reliable channel.
+        var desiredDurability = !entry.HasVolatileWriter && desiredReliability == ReliabilityKind.Reliable
+            ? DurabilityKind.TransientLocal
+            : DurabilityKind.Volatile;
+
         if (entry.HasSharedWriter && entry.HasExclusiveWriter)
         {
             Report(DiagnosticSeverity.Warning, entry.Info.TopicName,
@@ -415,7 +423,8 @@ public sealed class RtiDdsConnection : IDdsConnection
         {
             if (entry.Reader != null &&
                 entry.Reliability == desiredReliability &&
-                entry.Ownership == desiredOwnership)
+                entry.Ownership == desiredOwnership &&
+                entry.Durability == desiredDurability)
             {
                 return;
             }
@@ -425,12 +434,12 @@ public sealed class RtiDdsConnection : IDdsConnection
             {
                 DetachAndDisposeReader(entry);
                 Report(DiagnosticSeverity.Info, entry.Info.TopicName,
-                    $"Recreating reader as {desiredReliability}/{desiredOwnership} to match new writers.");
+                    $"Recreating reader as {desiredReliability}/{desiredOwnership}/{desiredDurability} to match new writers.");
             }
 
             try
             {
-                CreateReader(entry, desiredReliability, desiredOwnership);
+                CreateReader(entry, desiredReliability, desiredOwnership, desiredDurability);
             }
             catch (Exception ex)
             {
@@ -440,7 +449,11 @@ public sealed class RtiDdsConnection : IDdsConnection
         }
     }
 
-    private void CreateReader(TopicEntry entry, ReliabilityKind reliability, OwnershipKind ownership)
+    private void CreateReader(
+        TopicEntry entry,
+        ReliabilityKind reliability,
+        OwnershipKind ownership,
+        DurabilityKind durability)
     {
         entry.Topic ??= participant.LookupTopicDescription(entry.Info.TopicName) as Topic<DynamicData>
                         ?? participant.CreateTopic(entry.Info.TopicName, entry.DynamicType);
@@ -448,8 +461,12 @@ public sealed class RtiDdsConnection : IDdsConnection
         var qos = subscriber.DefaultDataReaderQos
             .WithReliability(policy => policy.Kind = reliability)
             .WithOwnership(policy => policy.Kind = ownership)
-            // VOLATILE: never ask a publisher to resend history just because a debug tool joined.
-            .WithDurability(policy => policy.Kind = DurabilityKind.Volatile)
+            // Derived like the two above. Where the writers keep history for late joiners, a
+            // viewer that connects - or reconnects - after the data was published still gets
+            // it; a topic written once at start-up otherwise stays empty for the whole session.
+            // Against VOLATILE writers nothing is requested, and nothing can be: what they wrote
+            // before this reader matched is not kept anywhere.
+            .WithDurability(policy => policy.Kind = durability)
             // KEEP_ALL plus a deep queue: bursts are buffered until the receive thread drains
             // them, rather than being overwritten before we see them.
             .WithHistory(policy => policy.Kind = HistoryKind.KeepAll)
@@ -466,6 +483,7 @@ public sealed class RtiDdsConnection : IDdsConnection
         entry.Decoder = new RtiPayloadDecoder(entry.TypeSchema, options.MaxCollectionElements);
         entry.Reliability = reliability;
         entry.Ownership = ownership;
+        entry.Durability = durability;
 
         var condition = reader.StatusCondition;
         condition.EnabledStatuses = StatusMask.DataAvailable | StatusMask.SampleLost |
@@ -787,9 +805,13 @@ public sealed class RtiDdsConnection : IDdsConnection
 
         public OwnershipKind Ownership { get; set; }
 
+        public DurabilityKind Durability { get; set; }
+
         public WriterRef PendingWriter { get; set; }
 
         public bool HasBestEffortWriter { get; private set; }
+
+        public bool HasVolatileWriter { get; private set; }
 
         public bool HasExclusiveWriter { get; private set; }
 
@@ -800,6 +822,11 @@ public sealed class RtiDdsConnection : IDdsConnection
             if (data.Reliability?.Kind == ReliabilityKind.BestEffort)
             {
                 HasBestEffortWriter = true;
+            }
+
+            if (data.Durability == null || data.Durability.Kind == DurabilityKind.Volatile)
+            {
+                HasVolatileWriter = true;
             }
 
             if (data.Ownership?.Kind == OwnershipKind.Exclusive)

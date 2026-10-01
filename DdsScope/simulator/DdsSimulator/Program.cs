@@ -91,8 +91,10 @@ internal static class Program
 
             foreach (var stream in streams)
             {
-                stream.WriteNext();
-                published++;
+                if (stream.WriteNext())
+                {
+                    published++;
+                }
             }
 
             if (started.Elapsed - lastReport > TimeSpan.FromSeconds(2))

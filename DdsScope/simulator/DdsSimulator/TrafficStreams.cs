@@ -13,20 +13,36 @@ public sealed class TrafficStream
     private readonly Action<DynamicData> fill;
     private readonly DynamicData sample;
 
-    internal TrafficStream(string topicName, DataWriter<DynamicData> writer, Action<DynamicData> fill)
+    private readonly int maxSamples;
+    private int written;
+
+    /// <param name="maxSamples">
+    /// Samples to write before the stream goes quiet; 0 writes forever. The writer is not
+    /// deleted when the limit is reached, so the topic stays discoverable with no traffic on it.
+    /// </param>
+    internal TrafficStream(string topicName, DataWriter<DynamicData> writer, Action<DynamicData> fill, int maxSamples = 0)
     {
         TopicName = topicName;
         this.writer = writer;
         this.fill = fill;
+        this.maxSamples = maxSamples;
         sample = writer.CreateData();
     }
 
     public string TopicName { get; }
 
-    public void WriteNext()
+    /// <summary>Writes the next sample; false once the stream has reached its limit.</summary>
+    public bool WriteNext()
     {
+        if (maxSamples > 0 && written >= maxSamples)
+        {
+            return false;
+        }
+
         fill(sample);
         writer.Write(sample);
+        written++;
+        return true;
     }
 }
 
@@ -41,6 +57,12 @@ public static class TrafficStreams
 
     /// <summary>Elements written into the SourceId sequence; fixed, see CreateSourceList.</summary>
     private const int SourceCount = 3;
+
+    /// <summary>
+    /// C_Track_Report writes this many samples at start-up and then stays silent with its
+    /// writer alive: a topic that exists on the network but carries no traffic any more.
+    /// </summary>
+    private const int TrackReportSampleCount = 10;
 
     /// <summary>
     /// Participant QoS a publisher needs for its types to be visible to a debug viewer.
@@ -64,7 +86,8 @@ public static class TrafficStreams
             CreatePlatform(participant, publisher, factory),
             CreateTrack(participant, publisher, factory),
             CreateSourceList(participant, publisher, factory),
-            CreateWideSensor(participant, publisher, factory)
+            CreateWideSensor(participant, publisher, factory),
+            CreateDerivedTrack(participant, publisher, factory)
         };
     }
 
@@ -212,7 +235,19 @@ public static class TrafficStreams
             .Create();
 
         var topic = participant.CreateTopic("C_Track_Report", type);
-        var writer = publisher.CreateDataWriter(topic);
+
+        // TRANSIENT_LOCAL with enough depth to keep everything this stream ever writes: the
+        // way a real system publishes state it sends once, so that late joiners still get it.
+        // KEEP_LAST depth is per instance, and no instance receives more than the total.
+        var writer = publisher.CreateDataWriter(
+            topic,
+            publisher.DefaultDataWriterQos
+                .WithDurability(p => p.Kind = Omg.Dds.Core.Policy.DurabilityKind.TransientLocal)
+                .WithHistory(p =>
+                {
+                    p.Kind = HistoryKind.KeepLast;
+                    p.Depth = TrackReportSampleCount;
+                }));
         var counter = 0;
 
         return new TrafficStream("C_Track_Report", writer, sample =>
@@ -228,7 +263,7 @@ public static class TrafficStreams
             }
 
             sample.SetAnyValue("Samples", points);
-        });
+        }, TrackReportSampleCount);
     }
 
     /// <summary>
@@ -279,6 +314,82 @@ public static class TrafficStreams
                 using var element = sources.Data.LoanValue((int)i);
                 element.Data.SetValue("SystemID", (int)i);
                 element.Data.SetValue("NodeID", counter + (int)i);
+            }
+        });
+    }
+
+    /// <summary>
+    /// A topic whose type inherits, two levels deep: <c>C_Derived_Track : TrackBase :
+    /// MessageHeader</c>, with the key declared in the outermost base.
+    ///
+    /// A struct type lists only the members it declares itself, so a viewer that does not walk
+    /// the parent chain shows <c>Label</c>, <c>Velocity.Z</c> and nothing else - no key, no
+    /// header. The nested member and the sequence elements use a derived type too, because
+    /// those are read through separate paths in the decoder.
+    /// </summary>
+    private static TrafficStream CreateDerivedTrack(DomainParticipant participant, Publisher publisher, DynamicTypeFactory factory)
+    {
+        var header = factory.BuildStruct()
+            .WithName("MessageHeader")
+            .AddMember(new StructMember("SourceID", factory.GetPrimitiveType<int>(), isKey: true))
+            .AddMember(new StructMember("Counter", factory.GetPrimitiveType<int>()))
+            .Create();
+
+        var trackBase = factory.BuildStruct()
+            .WithName("TrackBase")
+            .WithParent(header)
+            .AddMember(new StructMember("Range", factory.GetPrimitiveType<double>()))
+            .AddMember(new StructMember("Bearing", factory.GetPrimitiveType<double>()))
+            .Create();
+
+        var velocity2 = factory.BuildStruct()
+            .WithName("Velocity2")
+            .AddMember(new StructMember("X", factory.GetPrimitiveType<double>()))
+            .AddMember(new StructMember("Y", factory.GetPrimitiveType<double>()))
+            .Create();
+
+        var velocity3 = factory.BuildStruct()
+            .WithName("Velocity3")
+            .WithParent(velocity2)
+            .AddMember(new StructMember("Z", factory.GetPrimitiveType<double>()))
+            .Create();
+
+        var type = factory.BuildStruct()
+            .WithName("C_Derived_Track")
+            .WithParent(trackBase)
+            .AddMember(new StructMember("Label", factory.CreateString(32)))
+            .AddMember(new StructMember("Velocity", velocity3))
+            .AddMember(new StructMember("History", factory.CreateSequence(velocity3, 4)))
+            .Create();
+
+        var topic = participant.CreateTopic("C_Derived_Track", type);
+        var writer = publisher.CreateDataWriter(topic);
+        var counter = 0;
+
+        return new TrafficStream("C_Derived_Track", writer, sample =>
+        {
+            counter++;
+            sample.SetValue("SourceID", 1 + counter % 2);
+            sample.SetValue("Counter", counter);
+            sample.SetValue("Range", 1000.0 + counter % 500);
+            sample.SetValue("Bearing", counter % 360 * 1.0);
+            sample.SetValue("Label", "derived-" + counter % 10);
+
+            using (var velocity = sample.LoanValue("Velocity"))
+            {
+                velocity.Data.SetValue("X", counter % 10 * 1.0);
+                velocity.Data.SetValue("Y", counter % 10 * 2.0);
+                velocity.Data.SetValue("Z", counter % 10 * 3.0);
+            }
+
+            // Fixed count, for the reason given in CreateSourceList.
+            using var history = sample.LoanValue("History");
+            for (var i = 1; i <= 2; i++)
+            {
+                using var element = history.Data.LoanValue(i);
+                element.Data.SetValue("X", i * 1.0);
+                element.Data.SetValue("Y", i * 2.0);
+                element.Data.SetValue("Z", i * 3.0);
             }
         });
     }

@@ -192,7 +192,7 @@ the writers discovery reports, and the reader is rebuilt if a later writer chang
 | --- | --- | --- |
 | Reliability | RELIABLE unless any writer is BEST_EFFORT | lossless where possible, compatible always |
 | Ownership | derived; SHARED when writers disagree | must match exactly; disagreement is logged |
-| Durability | VOLATILE | never ask a publisher to resend history for a debug tool |
+| Durability | TRANSIENT_LOCAL when every writer offers it and the reader is RELIABLE, else VOLATILE | a late or reconnecting viewer still gets what the writers kept; never more than a writer offers, or it would not match |
 | History | KEEP_ALL with a deep resource limit | buffer bursts until the receive thread drains |
 | Partition | subscriber uses `*` | see writers in any partition |
 

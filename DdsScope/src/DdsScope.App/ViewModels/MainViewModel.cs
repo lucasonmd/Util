@@ -83,6 +83,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private string statusMessage = "Not connected.";
     private CaptureRowViewModel selectedRow;
     private TopicNodeViewModel selectedNode;
+    private IReadOnlyList<DdsQosItem> shownWriterQos;
     private MemoryLimitOption memoryLimit;
 
     public MainViewModel()
@@ -349,6 +350,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             {
                 SampleDetail.Add(node);
             }
+
+            // A sample has exactly one writer, so selecting it also says which writer the
+            // Writer tab should describe. The tree selection is left alone - moving it would
+            // re-filter the grid under the user. A cleared selection keeps what is shown; a
+            // sample whose writer is not known to this connection shows nothing rather than
+            // the previous writer's QoS.
+            if (value != null)
+            {
+                writerNodes.TryGetValue(value.Record.Writer.Id, out var writerNode);
+                ShowWriterDetail(writerNode?.Writer);
+            }
         }
     }
 
@@ -501,6 +513,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
 
         SelectedNode = null;
+        ShowWriterDetail(null);
         topicNodes.Clear();
         writerNodes.Clear();
         allTopics.Clear();
@@ -856,14 +869,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private void ApplySelection()
     {
-        WriterDetail.Clear();
-        if (selectedNode?.Writer != null)
-        {
-            foreach (var item in selectedNode.Writer.Qos)
-            {
-                WriterDetail.Add(item);
-            }
-        }
+        ShowWriterDetail(selectedNode?.Writer);
 
         // With a single topic selected the grid can show that type's fields as real columns.
         var schema = selectedNode?.Topic?.Schema;
@@ -880,6 +886,33 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         // frozen for up to one tick after every click. Typed filters stay coalesced.
         queryDirty = false;
         RebuildRows();
+    }
+
+    /// <summary>
+    /// Fills the Writer tab from a tree node or from the selected sample, whichever was
+    /// picked last.
+    ///
+    /// Live follow moves the selected row to the newest sample on every batch, so this is
+    /// called at the UI tick rate; the list is only rebuilt when it would actually change.
+    /// </summary>
+    private void ShowWriterDetail(DdsWriterInfo writer)
+    {
+        var qos = writer?.Qos;
+        if (ReferenceEquals(qos, shownWriterQos))
+        {
+            return;
+        }
+
+        shownWriterQos = qos;
+
+        WriterDetail.Clear();
+        if (qos != null)
+        {
+            foreach (var item in qos)
+            {
+                WriterDetail.Add(item);
+            }
+        }
     }
 
     /// <summary>Appends a term to the display filter, used by the payload context menu.</summary>

@@ -158,7 +158,7 @@ public static class RtiSchemaBuilder
 
         if (depth < MaxDepth)
         {
-            foreach (var member in type.Members)
+            foreach (var member in AllMembers(type))
             {
                 var child = BuildMemberNode(
                     member.Name,
@@ -182,6 +182,32 @@ public static class RtiSchemaBuilder
             Kind = ReadNodeKind.Struct,
             Children = children.ToArray()
         };
+    }
+
+    /// <summary>
+    /// The members of a struct including the ones it inherits, outermost base first - the
+    /// order IDL declares them in.
+    ///
+    /// <c>StructType.Members</c> lists only what the struct itself declares. For
+    /// <c>struct Derived : Base</c> that left every field of <c>Base</c> out of the schema,
+    /// and with it usually the key, which tends to live in the base type. DynamicData itself
+    /// addresses inherited members by name like any other, so only the plan needs them added.
+    /// </summary>
+    private static List<StructMember> AllMembers(StructType type)
+    {
+        var chain = new List<StructType>();
+        for (var current = type; current != null && chain.Count < MaxDepth; current = current.Parent)
+        {
+            chain.Add(current);
+        }
+
+        var members = new List<StructMember>();
+        for (var i = chain.Count - 1; i >= 0; i--)
+        {
+            members.AddRange(chain[i].Members);
+        }
+
+        return members;
     }
 
     private static ReadNode BuildUnionNode(
@@ -392,7 +418,7 @@ public static class RtiSchemaBuilder
         switch (type)
         {
             case StructType structType:
-                foreach (var member in structType.Members)
+                foreach (var member in AllMembers(structType))
                 {
                     members.Add(new KeyValuePair<string, DynamicType>(member.Name, member.Type));
                 }
