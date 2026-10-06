@@ -65,6 +65,12 @@ public static class TrafficStreams
     private const int TrackReportSampleCount = 10;
 
     /// <summary>
+    /// C_Mission_Config writes this many versions of one configuration at start-up, as
+    /// PERSISTENT, and then stays silent.
+    /// </summary>
+    private const int MissionConfigSampleCount = 5;
+
+    /// <summary>
     /// Participant QoS a publisher needs for its types to be visible to a debug viewer.
     ///
     /// Connext 7.x defaults type_code_max_serialized_length to 0, which means discovery
@@ -87,7 +93,8 @@ public static class TrafficStreams
             CreateTrack(participant, publisher, factory),
             CreateSourceList(participant, publisher, factory),
             CreateWideSensor(participant, publisher, factory),
-            CreateDerivedTrack(participant, publisher, factory)
+            CreateDerivedTrack(participant, publisher, factory),
+            CreateMissionConfig(participant, publisher, factory)
         };
     }
 
@@ -392,6 +399,48 @@ public static class TrafficStreams
                 element.Data.SetValue("Z", i * 3.0);
             }
         });
+    }
+
+    /// <summary>
+    /// A PERSISTENT topic written once at start-up: successive versions of a single
+    /// configuration instance, kept by the writer with a depth that holds them all.
+    ///
+    /// Without RTI Persistence Service running, a PERSISTENT writer keeps and redelivers its
+    /// own history the way a TRANSIENT_LOCAL one does; with the service, the service's writers
+    /// show up on the topic as well. Either way a viewer that joins or reconnects later has to
+    /// get every version back, which is what this topic checks.
+    /// </summary>
+    private static TrafficStream CreateMissionConfig(DomainParticipant participant, Publisher publisher, DynamicTypeFactory factory)
+    {
+        var type = factory.BuildStruct()
+            .WithName("C_Mission_Config")
+            .AddMember(new StructMember("ConfigID", factory.GetPrimitiveType<int>(), isKey: true))
+            .AddMember(new StructMember("Version", factory.GetPrimitiveType<int>()))
+            .AddMember(new StructMember("Name", factory.CreateString(32)))
+            .Create();
+
+        var topic = participant.CreateTopic("C_Mission_Config", type);
+
+        // Depth is per instance, and every sample goes to the one instance.
+        var writer = publisher.CreateDataWriter(
+            topic,
+            publisher.DefaultDataWriterQos
+                .WithDurability(p => p.Kind = Omg.Dds.Core.Policy.DurabilityKind.Persistent)
+                .WithHistory(p =>
+                {
+                    p.Kind = HistoryKind.KeepLast;
+                    p.Depth = MissionConfigSampleCount;
+                }));
+
+        var version = 0;
+
+        return new TrafficStream("C_Mission_Config", writer, sample =>
+        {
+            version++;
+            sample.SetValue("ConfigID", 1);
+            sample.SetValue("Version", version);
+            sample.SetValue("Name", "mission-v" + version);
+        }, MissionConfigSampleCount);
     }
 
     /// <summary>Fills a fixed-width char array the way a C publisher would: NUL-padded.</summary>

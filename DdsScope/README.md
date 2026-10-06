@@ -229,7 +229,7 @@ simulator\DdsSimulatorin\Debug
 et8.0\DdsSimulator.exe --domain 0 --rate 200
 ```
 
-It publishes six topics that resemble the target traffic:
+It publishes seven topics that resemble the target traffic:
 
 | Topic | Shape | Reliability |
 | --- | --- | --- |
@@ -239,6 +239,7 @@ It publishes six topics that resemble the target traffic:
 | `C_Source_List` | keyed struct, `char[8]`, `sequence<SourceId, 8>` (struct elements) | RELIABLE |
 | `C_Sensor_Wide` | 27 members over every primitive, an enum, a nested struct, a sequence | RELIABLE |
 | `C_Derived_Track` | inherits `TrackBase : MessageHeader` (key in the base), nested and sequence elements of a derived struct | RELIABLE |
+| `C_Mission_Config` | keyed struct; writes 5 versions of one instance at start-up, then stays silent | RELIABLE, PERSISTENT |
 
 The mixed reliability is deliberate: it exercises the viewer's per-topic reader QoS derivation.
 
@@ -249,7 +250,7 @@ The mixed reliability is deliberate: it exercises the viewer's per-topic reader 
 | `--seconds N` | stop after N seconds (default: run until Ctrl+C) |
 | `--publish-seconds N` | write for N seconds, then stop writing but keep the writers alive - for checking that a viewer started later still discovers every topic |
 | `--no-typecode` | publish without advertising the type, to exercise the viewer's `Type unavailable` path |
-| `--stress` | replace the six topics with a large uniform population, for discovery at scale |
+| `--stress` | replace the seven topics with a large uniform population, for discovery at scale |
 | `--topics N` | topics in stress mode (default 200) |
 | `--writers-per-topic N` | writers on each stress topic (default 5) |
 
