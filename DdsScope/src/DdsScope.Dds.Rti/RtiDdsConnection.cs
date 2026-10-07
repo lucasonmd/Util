@@ -53,6 +53,10 @@ public sealed class RtiDdsConnection : IDdsConnection
     private DomainParticipant participant;
     private Subscriber subscriber;
     private DataReader<PublicationBuiltinTopicData> publicationReader;
+    private DataReader<ParticipantBuiltinTopicData> participantReader;
+
+    /// <summary>IP addresses by participant key. Touched by the discovery thread only.</summary>
+    private readonly Dictionary<string, string> participantAddresses = new(StringComparer.Ordinal);
 
     private WaitSet receiveWaitSet;
     private GuardCondition receiveWakeup;
@@ -127,6 +131,11 @@ public sealed class RtiDdsConnection : IDdsConnection
             throw new InvalidOperationException("The publication built-in reader is not available.");
         }
 
+        // Looked up before Enable() for the same reason. Only the writers' IP addresses come
+        // from it, so its absence costs that one row and nothing else.
+        participantReader = participant.BuiltinSubscriber
+            .LookupDataReader<ParticipantBuiltinTopicData>(Subscriber.ParticipantBuiltinTopicName);
+
         participant.Enable();
 
         // A wildcard partition makes the tool see writers in any partition, which is the
@@ -199,6 +208,9 @@ public sealed class RtiDdsConnection : IDdsConnection
         {
             try
             {
+                // Participants first: a writer announced in this same round then finds its
+                // participant's address already known.
+                DrainParticipantReader();
                 DrainPublicationReader();
             }
             catch (Exception ex) when (!token.IsCancellationRequested)
@@ -207,6 +219,61 @@ public sealed class RtiDdsConnection : IDdsConnection
             }
 
             token.WaitHandle.WaitOne(DiscoveryPollInterval);
+        }
+    }
+
+    /// <summary>
+    /// Learns where each remote participant lives. A writer's own announcement carries no
+    /// address - the locators belong to its participant - so they are collected here and
+    /// joined to the writer by participant key.
+    /// </summary>
+    private void DrainParticipantReader()
+    {
+        if (participantReader == null)
+        {
+            return;
+        }
+
+        using var samples = participantReader.Take();
+        foreach (var sample in samples)
+        {
+            if (!sample.Info.ValidData)
+            {
+                continue;
+            }
+
+            try
+            {
+                var address = RtiQosDescriber.FormatAddresses(sample.Data.DefaultUnicastLocators);
+                if (address == null)
+                {
+                    continue;
+                }
+
+                var key = RtiQosDescriber.FormatKey(sample.Data.Key);
+                participantAddresses[key] = address;
+
+                // Participant discovery normally precedes its writers, but nothing guarantees
+                // the two built-in readers are drained in that order.
+                foreach (var writer in writers.Values)
+                {
+                    if (writer.ParticipantId != key)
+                    {
+                        continue;
+                    }
+
+                    var described = RtiQosDescriber.WithAddress(writer.Qos, address);
+                    if (!ReferenceEquals(described, writer.Qos))
+                    {
+                        writer.Qos = described;
+                        WriterUpdated?.Invoke(writer);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Report(DiagnosticSeverity.Warning, "discovery", Describe(ex));
+            }
         }
     }
 
@@ -254,7 +321,8 @@ public sealed class RtiDdsConnection : IDdsConnection
         });
 
         writer.LastSeen = DateTime.Now;
-        writer.Qos = RtiQosDescriber.Describe(data);
+        participantAddresses.TryGetValue(writer.ParticipantId, out var address);
+        writer.Qos = RtiQosDescriber.Describe(data, address);
         writersByHandle[handle] = writer.Reference;
 
         var cameBackOnline = !writer.IsOnline;
